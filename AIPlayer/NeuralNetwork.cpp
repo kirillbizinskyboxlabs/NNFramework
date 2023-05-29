@@ -85,19 +85,21 @@ void NeuralNetwork::setLabel(std::span<uint8_t> labels)
 
 void NeuralNetwork::train()
 {
-	for (auto&& layer : mLayers)
-	{
-		layer->propagateForward();
-		
-		if (mVerbosity == VERBOSITY::MAX)
-		{
-			layer->printOutput();
-		}
-	}
+	//for (auto&& layer : mLayers)
+	//{
+	//	layer->propagateForward();
+	//	
+	//	if (mVerbosity == VERBOSITY::MAX)
+	//	{
+	//		layer->printOutput();
+	//	}
+	//}
+
+	inference();
 
 	if (mVerbosity == VERBOSITY::LEVEL1)
 	{
-		//static_cast<CrossEntropy*>(mLayers.back())->printLoss();
+		static_cast<CrossEntropy*>(mLayers.back())->printOutput();
 		printLoss();
 	}
 
@@ -113,7 +115,25 @@ void NeuralNetwork::train()
 	}
 }
 
+void NeuralNetwork::inference()
+{
+	for (auto&& layer : mLayers)
+	{
+		layer->propagateForward();
+
+		if (mVerbosity == VERBOSITY::MAX)
+		{
+			layer->printOutput();
+		}
+	}
+}
+
 void NeuralNetwork::printLoss()
 {
 	static_cast<CrossEntropy*>(mLayers.back())->printLoss();
+}
+
+void NeuralNetwork::printOutput()
+{
+	static_cast<CrossEntropy*>(mLayers.back())->printOutput(); // don't need to cast really
 }

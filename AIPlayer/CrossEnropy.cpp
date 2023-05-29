@@ -26,8 +26,26 @@ CrossEntropy::~CrossEntropy()
 
 void CrossEntropy::printOutput()
 {
-    printLoss();
-    printGrad();
+    auto print = [batchSize = mBatchSize, numClasses = mNumClasses](float* hostPtr)
+    {
+        for (int64_t b = 0; b < std::min(batchSize, 10ll); ++b)
+        {
+            //float* outputHostPtr = mPreviousLayer->getOutputSurface().hostPtr;
+            auto beg = hostPtr + numClasses * b;
+            auto end = hostPtr + numClasses * (b + 1);
+            auto it = std::max_element(beg, end);
+            std::cout << std::distance(beg, it) << " ";
+        }
+        std::cout << std::endl;
+    };
+
+    std::cout << "Labels and NN output:" << std::endl;
+
+    mLabelSurface->devToHostSync();
+    print(mLabelSurface->hostPtr);
+
+    mPreviousLayer->getOutputSurface().devToHostSync();
+    print(mPreviousLayer->getOutputSurface().hostPtr);
 }
 
 void CrossEntropy::printLoss()
@@ -39,11 +57,6 @@ void CrossEntropy::printLoss()
 
 void CrossEntropy::printGrad()
 {
-    // kinda bad. Move to Layer?
-    //Utils::checkCudaError(cudaDeviceSynchronize());
-    //Utils::checkCudaError(cudaMemcpy(mPreviousLayer->getGradSurface().hostPtr, mPreviousLayer->getGradSurface().devPtr, size_t(sizeof(mPreviousLayer->getGradSurface().hostPtr[0]) * mPreviousLayer->getGradSurface().n_elems), cudaMemcpyDeviceToHost));
-    //Utils::checkCudaError(cudaDeviceSynchronize());
-
     mPreviousLayer->getGradSurface().devToHostSync();
 
     std::cout << "Cross Entropy derivative:" << std::endl;
@@ -66,52 +79,34 @@ void CrossEntropy::propagateBackward()
 
 void CrossEntropy::calculateLoss()
 {
-
     //TODO: change naming to Loss specific
     if (!mForwardPropagationPlan || !mForwardPropagationVariantPack)
     {
         throw;
     }
 
-    if (mVerbose) std::cout << "calculateLoss" << std::endl;
-    try
+    if (mVerbose) 
     {
-        //cudnnStatus_t status;
-        Utils::checkCudnnError(cudnnBackendExecute(mHandle, mForwardPropagationPlan->get_raw_desc(), mForwardPropagationVariantPack->get_raw_desc()));
-        //if (status != CUDNN_STATUS_SUCCESS)
-        //{
-        //    std::cout << cudnnGetErrorString(status) << std::endl;
-        //}
+        std::cout << "calculateLoss" << std::endl;
     }
-    catch (cudnn_frontend::cudnnException& e) {
-        std::cout << "[ERROR] Exception " << e.what() << std::endl;
-    }
+
+    Utils::checkCudnnError(cudnnBackendExecute(mHandle, mForwardPropagationPlan->get_raw_desc(), mForwardPropagationVariantPack->get_raw_desc()));
 }
 
 void CrossEntropy::calculateGrad()
 {
+    // deduplicate?
     if (!mGradPlan || !mGradVariantPack)
     {
         throw;
     }
 
-    //if (mVerbose) 
-    //{
-    //    std::cout << "calculateGrad" << std::endl;
-    //}
-
-    try
+    if (mVerbose) 
     {
-        cudnnStatus_t status;
-        status = cudnnBackendExecute(mHandle, mGradPlan->get_raw_desc(), mGradVariantPack->get_raw_desc());
-        if (status != CUDNN_STATUS_SUCCESS)
-        {
-            std::cout << cudnnGetErrorString(status) << std::endl;
-        }
+        std::cout << "calculateGrad" << std::endl;
     }
-    catch (cudnn_frontend::cudnnException& e) {
-        std::cout << "[ERROR] Exception " << e.what() << std::endl;
-    }
+
+    Utils::checkCudnnError(cudnnBackendExecute(mHandle, mGradPlan->get_raw_desc(), mGradVariantPack->get_raw_desc()));
 }
 
 void CrossEntropy::setLabel(std::span<uint8_t> labels)

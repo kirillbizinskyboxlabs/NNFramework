@@ -42,8 +42,10 @@ public:
 	void setLabel(std::span<uint8_t> labels); // should it also be a responsibility of a user??
 
 	void train();
+	void inference();
 
 	void printLoss();
+	void printOutput();
 
 private:
 	cudnnHandle_t mHandle;

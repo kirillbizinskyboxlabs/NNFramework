@@ -184,6 +184,7 @@ namespace LeNet
             {
                 std::cout << std::format("Iter {} ", iter_num);
                 nn.printLoss();
+                nn.printOutput();
             }
         }
     }
