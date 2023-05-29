@@ -153,15 +153,9 @@
     <ClCompile Include="Layer.cpp" />
     <ClCompile Include="LeNet.cpp" />
     <ClCompile Include="LeNet.ixx" />
-    <ClCompile Include="LeNetHelpers.cpp" />
-    <ClCompile Include="LeNetHelpers.h" />
-    <ClCompile Include="LenetLayers.cpp" />
-    <ClCompile Include="LenetLayers.h" />
-    <ClCompile Include="MinimalTest.cpp" />
     <ClCompile Include="MNISTData.ixx" />
     <ClCompile Include="NeuralNetwork.cpp" />
     <ClCompile Include="Pool.cpp" />
-    <ClCompile Include="SimpleFrontendTest.ixx" />
     <ClCompile Include="Softmax.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -170,10 +164,8 @@
     <ClInclude Include="DevUtils.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Layer.h" />
-    <ClInclude Include="MinimalTest.h" />
     <ClInclude Include="NeuralNetwork.h" />
     <ClInclude Include="Pool.h" />
-    <ClInclude Include="SimpleFrontendTest.h" />
     <ClInclude Include="Softmax.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

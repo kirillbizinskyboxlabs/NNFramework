@@ -1,33 +1,20 @@
 // AIPlayer.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include "MinimalTest.h"
 import MNISTData;
-//import SimpleFrontendTest;
-//#include "SimpleFrontendTest.h"
 
 import LeNet;
 
 import <iostream>;
-import <ranges>;
-import <vector>;
-import <utility>;
+//import <ranges>;
+//import <vector>;
+//import <utility>;
 
 void testDataRetrieval();
 
 int main()
 {
-    //minimalExample();
-    //GetData();
-    //testDataRetrieval();
-    
-    //Test();
-
-    //MNISTDataHolder dh;
-    //dh.initialize();
-
     LeNet::LenetForward();
-
 }
 
 void testDataRetrieval()

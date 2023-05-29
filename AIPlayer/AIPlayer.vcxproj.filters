@@ -18,31 +18,13 @@
     <ClCompile Include="AIPlayer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MinimalTest.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SimpleFrontendTest.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MNISTData.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="LeNet.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="LeNetHelpers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="LeNetHelpers.h">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="LeNet.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="LenetLayers.h">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="LenetLayers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Layer.cpp">
@@ -71,12 +53,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MinimalTest.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SimpleFrontendTest.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Layer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
