@@ -43,6 +43,8 @@ public:
 
 	void train();
 
+	void printLoss();
+
 private:
 	cudnnHandle_t mHandle;
 
@@ -52,5 +54,8 @@ private:
 	std::vector<int64_t> mInputDims; //?
 
 	VERBOSITY mVerbosity;
+
+	float mLearningRate;
+	size_t mIter = 0;
 };
 

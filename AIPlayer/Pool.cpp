@@ -30,7 +30,7 @@ Pool::Pool(cudnnHandle_t& handle,
     mOutputSurface = std::make_unique<Surface<float>>(Psize, 0.0f);
     mGradSurface = std::make_unique<Surface<float>>(Psize, 0.0f);
 
-    std::cout << inputTensor.describe() << std::endl;
+    if (mVerbose) std::cout << inputTensor.describe() << std::endl;
 
     try
     {
@@ -45,7 +45,7 @@ Pool::Pool(cudnnHandle_t& handle,
 
         int64_t stride[nbDims];
 
-        auto const nanOpt = CUDNN_NOT_PROPAGATE_NAN;
+        auto const nanOpt = CUDNN_PROPAGATE_NAN; //CUDNN_NOT_PROPAGATE_NAN
         constexpr int64_t nbSpatialDims = 2;
         cudnn_frontend::cudnnResampleMode_t const mode = cudnn_frontend::cudnnResampleMode_t::CUDNN_RESAMPLE_AVGPOOL_INCLUDE_PADDING;
         cudnn_frontend::cudnnPaddingMode_t const padding_mode = cudnn_frontend::cudnnPaddingMode_t::CUDNN_ZERO_PAD;
@@ -94,7 +94,7 @@ Pool::Pool(cudnnHandle_t& handle,
         uids.emplace_back(inputTensor.getId());
         uids.emplace_back(mOutputTensor->getId());
 
-        std::cout << "Setting forward propagation" << std::endl;
+        if (mVerbose) std::cout << "Setting forward propagation" << std::endl;
         _setForwardPropagationPlan(ops, data_ptrs, uids);
 
         // backpropagation
@@ -226,7 +226,7 @@ void Pool::_setupGrad(int64_t poolTensorDim[])
             .setDataType(dataType)
             .build();
 
-        std::cout << "Setting poolBwdDesc" << std::endl;
+        if (mVerbose) std::cout << "Setting poolBwdDesc" << std::endl;
         auto poolBwdDesc = cudnn_frontend::ResampleDescBuilder()
             .setComputeType(dataType)
             .setNanPropagation(nanOpt)
@@ -237,9 +237,9 @@ void Pool::_setupGrad(int64_t poolTensorDim[])
             .setPrePadding(nbSpatialDims, prePaddingPool)
             .setPostPadding(nbSpatialDims, postPaddingPool)
             .build();
-        std::cout << poolBwdDesc.describe() << std::endl;
+        if (mVerbose) std::cout << poolBwdDesc.describe() << std::endl;
         // Create a Resample Node
-        std::cout << "Setting pool_bwd_op" << std::endl;
+        if (mVerbose) std::cout << "Setting pool_bwd_op" << std::endl;
         auto pool_bwd_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_RESAMPLE_BWD_DESCRIPTOR)
             .setdyDesc(gradTensor)
             //.setxDesc(inputTensor)
@@ -259,7 +259,7 @@ void Pool::_setupGrad(int64_t poolTensorDim[])
         uids_bwd.emplace_back(inputGradTensor.getId());
         uids_bwd.emplace_back(gradTensor.getId());
 
-        std::cout << "Setting back propagation" << std::endl;
+        if (mVerbose) std::cout << "Setting back propagation" << std::endl;
         _setPlan(ops_bwd, data_ptrs_bwd, uids_bwd, mDataGradPlan, mDataGradVariantPack, mDataGradWorkspaceSize, mDataGradWorkspacePtr);
     }
     catch (cudnn_frontend::cudnnException& e) {

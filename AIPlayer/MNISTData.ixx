@@ -76,7 +76,7 @@ public:
             for (uint32_t j = 0; j < imageSize; ++j)
             {
                 size_t px = imageSize * i + j;
-                dataPtr[px] = static_cast<T>(images[current + i][j]);
+                dataPtr[px] = (static_cast<T>(images[current + i][j])) / 255.0f;
             }
 
             constexpr size_t numClasses = 10; // can be member var
@@ -94,6 +94,11 @@ public:
         }
 
         current += batchSize;
+    }
+
+    auto getTrainSize() const
+    {
+        return images.size();
     }
 
 private:

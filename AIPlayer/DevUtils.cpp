@@ -21,7 +21,7 @@ namespace
 
 void Utils::initImage(float* image, int64_t imageSize)
 {
-    constexpr float numerator = 2.0f; // depending on optimization strategy different numerators are suggested. Althernative is to use 3.0f
+    constexpr float numerator = 3.0f; // depending on optimization strategy different numerators are suggested. Althernative is to use 3.0f
 
     std::random_device dev;
     std::mt19937 gen(dev());
@@ -43,7 +43,7 @@ cudnn_frontend::ExecutionPlan Utils::get_execplan_from_heuristics_else_fall_back
             .setHeurMode(CUDNN_HEUR_MODE_INSTANT)
             .build();
 
-        std::cout << "Heuristic has " << heuristics.getEngineConfigCount() << " configurations " << std::endl;
+        //std::cout << "Heuristic has " << heuristics.getEngineConfigCount() << " configurations " << std::endl;
         auto& engine_config = heuristics.getEngineConfig(heuristics.getEngineConfigCount());
 
         // Try engine configs returned by the heuristics and pick up the first one that works.
@@ -69,12 +69,12 @@ cudnn_frontend::ExecutionPlan Utils::get_execplan_from_heuristics_else_fall_back
             "heuristics_fallback"
                 }, opGraph, allowAll, filtered_configs, true);
 
-        std::cout << "get_heuristics_list Statuses: ";
-        for (auto status : statuses) {
-            std::cout << cudnn_frontend::to_string(status) << " ";
-        }
-        std::cout << std::endl;
-        std::cout << "Filter config list has " << filtered_configs.size() << " configurations " << std::endl;
+        //std::cout << "get_heuristics_list Statuses: ";
+        //for (auto status : statuses) {
+        //    std::cout << cudnn_frontend::to_string(status) << " ";
+        //}
+        //std::cout << std::endl;
+        //std::cout << "Filter config list has " << filtered_configs.size() << " configurations " << std::endl;
 
         return cudnn_frontend::ExecutionPlanBuilder().setHandle(handle_).setEngineConfig(filtered_configs[0], opGraph.getTag()).build();
     }

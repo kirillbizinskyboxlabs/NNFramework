@@ -60,7 +60,7 @@ void CrossEntropy::printGrad()
 
 void CrossEntropy::propagateBackward()
 {
-    std::cout << "Back Propagating on CrossEntropy" << std::endl;
+    if (mVerbose) std::cout << "Back Propagating on CrossEntropy" << std::endl;
     calculateGrad();
 }
 
@@ -76,12 +76,12 @@ void CrossEntropy::calculateLoss()
     if (mVerbose) std::cout << "calculateLoss" << std::endl;
     try
     {
-        cudnnStatus_t status;
-        status = cudnnBackendExecute(mHandle, mForwardPropagationPlan->get_raw_desc(), mForwardPropagationVariantPack->get_raw_desc());
-        if (status != CUDNN_STATUS_SUCCESS)
-        {
-            std::cout << cudnnGetErrorString(status) << std::endl;
-        }
+        //cudnnStatus_t status;
+        Utils::checkCudnnError(cudnnBackendExecute(mHandle, mForwardPropagationPlan->get_raw_desc(), mForwardPropagationVariantPack->get_raw_desc()));
+        //if (status != CUDNN_STATUS_SUCCESS)
+        //{
+        //    std::cout << cudnnGetErrorString(status) << std::endl;
+        //}
     }
     catch (cudnn_frontend::cudnnException& e) {
         std::cout << "[ERROR] Exception " << e.what() << std::endl;
@@ -181,7 +181,7 @@ void CrossEntropy::_initLoss()
 
     using namespace cudnn_frontend;
 
-    std::cout << inputTensor.describe() << std::endl;
+    if (mVerbose) std::cout << inputTensor.describe() << std::endl;
 
     try
     {
@@ -304,7 +304,7 @@ void CrossEntropy::_initGrad()
     int64_t gradDim[] = { inputDim[0], inputDim[1], inputDim[2] };
     int64_t gradStride[] = { inputDim[1] * inputDim[2], inputDim[2], 1};
 
-    std::cout << inputTensor.describe() << std::endl;
+    if (mVerbose) std::cout << inputTensor.describe() << std::endl;
     try
     {
         auto labelTensor = TensorBuilder()

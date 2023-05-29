@@ -45,7 +45,7 @@ void NeuralNetwork::addConvBiasAct(const int64_t kernelSize, const int64_t filte
 {
 	bool needDataGrad = mLayers.size() > 1;
 	bool mTraining = true; // TODO: move to member var
-	mLayers.emplace_back(new ConvBiasAct(mHandle, kernelSize, filterSize, mLayers.back(), convPad, mTraining, needDataGrad, verbose, std::move(name)));
+	mLayers.emplace_back(new ConvBiasAct(mHandle, kernelSize, filterSize, mLayers.back(), mLearningRate, convPad, mTraining, needDataGrad, verbose, std::move(name)));
 }
 
 void NeuralNetwork::addPool(bool verbose, std::string name)
@@ -95,6 +95,14 @@ void NeuralNetwork::train()
 		}
 	}
 
+	if (mVerbosity == VERBOSITY::LEVEL1)
+	{
+		//static_cast<CrossEntropy*>(mLayers.back())->printLoss();
+		printLoss();
+	}
+
+	mLearningRate = static_cast<float>(0.0001 * pow((1.0 + 0.0001 * mIter++), (-0.75)));
+
 	for (auto it = mLayers.rbegin(); it != mLayers.rend(); ++it)
 	{
 		(*it)->propagateBackward();
@@ -103,4 +111,9 @@ void NeuralNetwork::train()
 			(*it)->printGrad();
 		}
 	}
+}
+
+void NeuralNetwork::printLoss()
+{
+	static_cast<CrossEntropy*>(mLayers.back())->printLoss();
 }

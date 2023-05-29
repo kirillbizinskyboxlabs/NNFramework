@@ -8,6 +8,7 @@ public:
 		const int64_t kernelSize,
 		const int64_t filterSize,
 		Layer* previousLayer,
+		const float& learningRate,
 		const int64_t convPad = 2,
 		bool training = true,
 		bool needDataGrad = true,
@@ -45,10 +46,18 @@ private:
 	//size_t mGradWorkspaceSize;
 	//void* mGradWorkspacePtr;
 
-	float mLearningRate = 0.01;
+	//float mLearningRate = 0.001;
+	const float& mLearningRate;
 	bool mNeedDataGrad = true;
 
 	std::unique_ptr<Surface<float>> mBiasGradSurface;
 	std::unique_ptr<Surface<float>> mWeightsGradSurface;
+	std::unique_ptr<Surface<float>>	mActivationGradSurface;
+
+	std::unique_ptr<cudnn_frontend::ExecutionPlan> mActivationGradPlan;
+	std::unique_ptr<cudnn_frontend::VariantPack> mActivationGradVariantPack;
+
+	int64_t mActivationGradWorkspaceSize;
+	void* mActivationGradWorkspacePtr;
 };
 

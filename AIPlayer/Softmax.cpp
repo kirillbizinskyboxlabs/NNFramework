@@ -51,7 +51,7 @@ Softmax::Softmax(cudnnHandle_t& handle,
     
     int64_t size = std::accumulate(mDims.begin(), mDims.end(), 1ll, std::multiplies<int64_t>());
 
-    std::cout << std::endl << size << std::endl << inputTensor.describe() << std::endl;
+    if (mVerbose) std::cout << std::endl << size << std::endl << inputTensor.describe() << std::endl;
 
     mOutputSurface = std::make_unique<Surface<float>>(size, 0.0f);
 
@@ -82,7 +82,7 @@ Softmax::Softmax(cudnnHandle_t& handle,
 
 void Softmax::propagateForward()
 {
-    std::cout << "Softmax propagate Forward" << std::endl;
+    if (mVerbose) std::cout << "Softmax propagate Forward" << std::endl;
     // TODO: Proper defaults
     constexpr float alpha = 1.0f;
     constexpr float beta = 0.0f;

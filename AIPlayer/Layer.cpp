@@ -218,5 +218,4 @@ void Layer::_setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
 void Layer::_setForwardPropagationPlan(std::vector<cudnn_frontend::Operation const*>& ops, std::vector<void*> data_ptrs, std::vector<int64_t> uids)
 {
     _setPlan(ops, data_ptrs, uids, mForwardPropagationPlan, mForwardPropagationVariantPack, mForwardPropagationWorkspaceSize, mForwardPropagationWorkspacePtr);
-
 }

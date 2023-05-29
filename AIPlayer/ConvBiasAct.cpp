@@ -9,12 +9,14 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
     const int64_t kernelSize,
     const int64_t filterSize,
     Layer* previousLayer,
+    const float& learningRate,
     const int64_t convPad,
     bool training,
     bool needDataGrad,
     bool verbose,
     std::string name)
     : Layer(handle, previousLayer, verbose, std::move(name))
+    , mLearningRate(learningRate)
     , mNeedDataGrad(needDataGrad)
 {
     // Defaults. TODO: Move to the appropriate place. Some of these are hyperparameters. Some are necessary constants. Bad place.
@@ -270,7 +272,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
         mDataGradWorkspaceSize = std::max(mBwdDPerf.memory, mBwdFPerf.memory);
 
-        std::cout << std::format("{} backpropagation descriptor setup completed. Workspace size: {}", mName, mDataGradWorkspaceSize) << std::endl;
+        if (mVerbose) std::cout << std::format("{} backpropagation descriptor setup completed. Workspace size: {}", mName, mDataGradWorkspaceSize) << std::endl;
 
         if (mDataGradWorkspaceSize > 0)
         {
@@ -335,10 +337,15 @@ void ConvBiasAct::propagateBackward()
     //    mBiasGradSurface->devPtr, 1,
     //    B->devPtr, 1));
 
-    std::cout << std::format("Propagating backwards on {}", mName) << std::endl;
+    Utils::checkCudnnError(cudnnBackendExecute(mHandle, mActivationGradPlan->get_raw_desc(), mActivationGradVariantPack->get_raw_desc()));
 
-    _printBias();
-    _printFilter();
+    if (mVerbose)
+    {
+        std::cout << std::format("Propagating backwards on {}", mName) << std::endl;
+
+        _printBias();
+        _printFilter();
+    }
 
     float alpha = 1.0f, beta = 0.0f; // not sure, maybe it can be a nn member
 
@@ -346,7 +353,8 @@ void ConvBiasAct::propagateBackward()
         mHandle, 
         &alpha, 
         mGradTensorDesc,
-        mGradSurface->devPtr, 
+        //mGradSurface->devPtr, 
+        mActivationGradSurface->devPtr,
         &beta, 
         mBiasGradTensorDesc,
         mBiasGradSurface->devPtr));
@@ -357,7 +365,8 @@ void ConvBiasAct::propagateBackward()
         mInputTensorDesc,
         mPreviousLayer->getOutputSurface().devPtr,
         mGradTensorDesc,
-        mGradSurface->devPtr,
+        //mGradSurface->devPtr,
+        mActivationGradSurface->devPtr,
         mConvDesc,
         mBwdFPerf.algo,
         mDataGradWorkspacePtr, 
@@ -373,7 +382,8 @@ void ConvBiasAct::propagateBackward()
             mFilterDesc,
             mWeightsGradSurface->devPtr,
             mGradTensorDesc,
-            mGradSurface->devPtr,
+            //mGradSurface->devPtr,
+            mActivationGradSurface->devPtr,
             mConvDesc,
             mBwdDPerf.algo,
             mDataGradWorkspacePtr, 
@@ -401,14 +411,70 @@ void ConvBiasAct::propagateBackward()
             mBiasSurface->devPtr, 1);
     }
 
-    _printBias();
-    _printFilter();
+    if (mVerbose)
+    {
+        _printBias();
+        _printFilter();
+    }
 }
 
 void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
 {
     mBiasGradSurface = std::make_unique<Surface<float>>(mBiasSurface->n_elems, 0.0f);
     mWeightsGradSurface = std::make_unique<Surface<float>>(mWeightsSurface->n_elems, 0.0f);
+    mActivationGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
+
+    try
+    {
+        auto gradTensor = cudnn_frontend::TensorBuilder()
+            .setAlignment(mOutputTensor->getAlignment())
+            .setDataType(CUDNN_DATA_FLOAT)
+            .setDim(mOutputTensor->getDimCount(), mOutputTensor->getDim())
+            .setStride(mOutputTensor->getDimCount(), mOutputTensor->getStride())
+            .setId(generateTensorId())
+            .build();
+
+        auto after_activation_tensor = cudnn_frontend::TensorBuilder()
+            .setAlignment(mOutputTensor->getAlignment())
+            .setDataType(CUDNN_DATA_FLOAT)
+            .setDim(mOutputTensor->getDimCount(), mOutputTensor->getDim())
+            .setStride(mOutputTensor->getDimCount(), mOutputTensor->getStride())
+            .setId(generateTensorId())
+            .build();
+
+        // backwards relu
+        auto actDesc = cudnn_frontend::PointWiseDescBuilder()
+            .setMode(CUDNN_POINTWISE_RELU_BWD)
+            .setComputeType(CUDNN_DATA_FLOAT)
+            .build();
+        if (mVerbose) std::cout << actDesc.describe() << std::endl;
+
+        auto act_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
+            .setdyDesc(gradTensor)
+            .setxDesc(*mOutputTensor)
+            .setdxDesc(after_activation_tensor)
+            .setpwDesc(actDesc)
+            .build();
+        if (mVerbose) std::cout << act_op.describe() << std::endl;
+        std::vector<cudnn_frontend::Operation const*> ops;
+        ops.emplace_back(&act_op);
+
+        std::vector<void*> data_ptrs;
+        data_ptrs.emplace_back(mGradSurface->devPtr);
+        data_ptrs.emplace_back(mOutputSurface->devPtr);
+        data_ptrs.emplace_back(mActivationGradSurface->devPtr);
+
+        std::vector<int64_t> uids;
+        uids.emplace_back(gradTensor.getId());
+        uids.emplace_back(mOutputTensor->getId());
+        uids.emplace_back(after_activation_tensor.getId());
+
+        _setPlan(ops, data_ptrs, uids, mActivationGradPlan, mActivationGradVariantPack, mActivationGradWorkspaceSize, mActivationGradWorkspacePtr);
+    }
+    catch (cudnn_frontend::cudnnException& e) {
+        std::cout << "[ERROR] Exception " << e.what() << std::endl;
+        assert(false);
+    }
 }
 
 void ConvBiasAct::_setupBiasBackPropagation()
