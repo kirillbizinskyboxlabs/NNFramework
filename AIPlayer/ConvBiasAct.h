@@ -1,0 +1,54 @@
+#pragma once
+#include "Layer.h"
+
+class ConvBiasAct : public Layer
+{
+public:
+	ConvBiasAct(cudnnHandle_t& handle,
+		const int64_t kernelSize,
+		const int64_t filterSize,
+		Layer* previousLayer,
+		const int64_t convPad = 2,
+		bool training = true,
+		bool needDataGrad = true,
+		bool verbose = false,
+		std::string name = "ConvBiasAct");
+	ConvBiasAct(const ConvBiasAct&) = delete;
+	ConvBiasAct& operator=(const ConvBiasAct&) = delete;
+	~ConvBiasAct() = default;
+
+	void propagateBackward() override;
+private:
+	void _setupBackPropagation(bool needDataGrad);
+	void _setupBiasBackPropagation();
+	void _setupWeightBackPropagation();
+	void _setupDataBackPropagation();
+
+	void _printBias();
+	void _printFilter();
+
+	std::unique_ptr<Surface<float>> mWeightsSurface;
+	std::unique_ptr<Surface<float>> mBiasSurface;
+
+	//cudnnReduceTensorDescriptor_t mReduceTensorDesc;
+	cudnnTensorDescriptor_t mInputTensorDesc; // TODO: acquire from previous Layer
+	cudnnTensorDescriptor_t mGradTensorDesc; // TODO: move to Layer
+	cudnnTensorDescriptor_t mBiasGradTensorDesc;
+	cudnnFilterDescriptor_t mFilterDesc;
+	cudnnConvolutionDescriptor_t mConvDesc;
+	cudnnConvolutionBwdDataAlgoPerf_t mBwdDPerf;
+	cudnnConvolutionBwdFilterAlgoPerf_t mBwdFPerf;
+
+	size_t mBiasGradWorkspaceSize;
+	void* mBiasGradWorkspacePtr;
+
+	//size_t mGradWorkspaceSize;
+	//void* mGradWorkspacePtr;
+
+	float mLearningRate = 0.01;
+	bool mNeedDataGrad = true;
+
+	std::unique_ptr<Surface<float>> mBiasGradSurface;
+	std::unique_ptr<Surface<float>> mWeightsGradSurface;
+};
+

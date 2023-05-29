@@ -55,6 +55,47 @@ public:
         return std::make_pair(num_rows, num_cols);
     }
 
+    template<typename T>
+    void loadData(uint32_t batchSize, T* dataPtr, T* labelPtr)
+    {
+        if (batchSize > num_images)
+        {
+            std::cerr << "Too large request\n";
+            throw;
+        }
+
+        // if batchSize isn't a multiply of num_images this might lead to some of them never being used. TODO: rethink
+        if (current + batchSize >= num_images)
+        {
+            current = 0;
+        }
+
+        for (uint32_t i = 0; i < batchSize; ++i)
+        {
+            const uint32_t imageSize = num_rows * num_cols;
+            for (uint32_t j = 0; j < imageSize; ++j)
+            {
+                size_t px = imageSize * i + j;
+                dataPtr[px] = static_cast<T>(images[current + i][j]);
+            }
+
+            constexpr size_t numClasses = 10; // can be member var
+            for (size_t j = 0; j < numClasses; ++j)
+            {
+                if (labels[current + i] == j)
+                {
+                    labelPtr[i * numClasses + j] = 1;
+                }
+                else
+                {
+                    labelPtr[i * numClasses + j] = 0;
+                }
+            }
+        }
+
+        current += batchSize;
+    }
+
 private:
     std::vector<std::vector<uint8_t>> images;
     std::vector<uint8_t> labels;
