@@ -1,67 +1,75 @@
-//module;
-//
-//#include <cudnn_frontend.h>
-//
-//module LeNet;
-//
-//import <vector>;
-//import <string>;
-//
-//using Words = std::vector<std::string>;
-//
-//namespace LeNet
-//{
-//	Words getWords()
-//	{
-//		return Words();
-//	}
-//}
+module;
 
-//
-//import <iostream>;
-//
-////import :Helpers;
-//
-//namespace LeNet
-//{
-//    void RigidTest()
-//    {
-//        std::cout << "Rigid LeNet Test v0.1" << std::endl;
-//        //INFO("TEST_CASE :: Use heuristics for engine generation");
-//        int64_t dimA[] = { 1, 1, 28, 28 };
-//        int64_t filterdimA[] = { 1, 6, 5, 5 };
-//        int64_t outdimA[] = { 0, 0, 0, 0 }; // Computed Below
-//        int64_t padA[] = { 2, 2 };
-//        int64_t dilationA[] = { 1, 1 };
-//        int64_t convstrideA[] = { 1, 1 };
-//
-//        int numErrors = 0;
-//
-//        //outdimA[0] = dimA[0];
-//        //outdimA[1] = filterdimA[0];
-//        //for (int dim = 0; dim < 2; dim++) {
-//        //    outdimA[dim + 2] = getFwdConvOutputDim(dimA[dim + 2], padA[dim], filterdimA[dim + 2], convstrideA[dim], dilationA[dim]);
-//        //}
-//
-//
-//        //cudnnConvolutionMode_t mode = CUDNN_CONVOLUTION;
-//
-//        //printf("====DIMENSIONS====\n");
-//        //printf("input dims are %lld, %lld, %lld, %lld\n", dimA[0], dimA[1], dimA[2], dimA[3]);
-//        //printf("filter dims are %lld, %lld, %lld, %lld\n", filterdimA[0], filterdimA[1], filterdimA[2], filterdimA[3]);
-//        //printf("output dims are %lld, %lld, %lld, %lld\n", outdimA[0], outdimA[1], outdimA[2], outdimA[3]);
-//
-//
-//        //int64_t Xsize = dimA[0] * dimA[1] * dimA[2] * dimA[3];
-//        //int64_t Wsize = filterdimA[0] * filterdimA[1] * filterdimA[2] * filterdimA[3];
-//        //int64_t Ysize = outdimA[0] * outdimA[1] * outdimA[2] * outdimA[3];
-//
-//        //float* devPtrX = NULL;
-//        //float* devPtrW = NULL;
-//        //float* devPtrY = NULL;
-//
-//        //checkCudaErr(cudaMalloc((void**)&(devPtrX), size_t((Xsize) * sizeof(devPtrX[0]))));
-//        //checkCudaErr(cudaMalloc((void**)&(devPtrW), size_t((Wsize) * sizeof(devPtrW[0]))));
-//        //checkCudaErr(cudaMalloc((void**)&(devPtrY), size_t((Ysize) * sizeof(devPtrY[0]))));
-//    }
-//}
+#include "NeuralNetwork.h"
+
+module LeNet;
+
+import <iostream>;
+import <format>;
+
+import MNISTData;
+
+namespace LeNet
+{
+    void LenetForward()
+    {
+        std::cout << "LeNet Test v1.0" << std::endl;
+
+        // Hyperparameters?
+        constexpr int64_t batchSize = 512;
+        constexpr int64_t inputH = 28;
+        constexpr int64_t inputW = 28;
+        constexpr int64_t C1Features = 32;
+        constexpr int64_t C1KernelSize = 5;
+        constexpr int64_t C1Padding = 2;
+        constexpr int64_t C3Features = 64;
+        constexpr int64_t C3KernelSize = 5;
+        constexpr int64_t C3Padding = 0;
+        constexpr int64_t C5Features = 1024;
+        constexpr int64_t C5KernelSize = 5;
+        constexpr int64_t C5Padding = 0;
+        constexpr int64_t FC6OutputSize = 84;
+        constexpr int64_t FC7OutputSize = 10;
+
+        bool verbose = false;
+
+        MNISTDataHolder dh;
+        dh.initialize();
+        //auto [image, label] = dh.getNextTrain();
+        //auto [images, labels] = dh.getNextNTrain(batchSize);
+        auto [rows, cols] = dh.getDimensions();
+
+        std::vector<size_t> dims = { 1, rows, cols };
+
+        NeuralNetwork nn(batchSize, dims.size(), dims.data(), NeuralNetwork::VERBOSITY::MIN);
+        nn.addConvBiasAct(C1KernelSize, C1Features, C1Padding, verbose, "C1");
+        nn.addPool(verbose, "S2");
+        nn.addConvBiasAct(C3KernelSize, C3Features, C3Padding, verbose, "C3");
+        nn.addPool(verbose, "S4");
+        nn.addConvBiasAct(C5KernelSize, C5Features, 0, verbose, "FC5");
+        //nn.addConvBiasAct(1, FC6OutputSize, 0, verbose, "FC6");
+        nn.addConvBiasAct(1, FC7OutputSize, 0, verbose, "FC7");
+        nn.addSoftmax(verbose);
+        nn.addCrossEntropy(verbose);
+
+
+        size_t epoch_num = 200;
+        size_t iter_num = epoch_num * (dh.getTrainSize() / batchSize);
+
+
+        while (iter_num--)
+        {
+            dh.loadData(batchSize, nn.getInputDataPtr(), nn.getLabelDataPtr());
+            nn.syncLabel();
+
+            nn.train();
+
+            if (iter_num % (dh.getTrainSize() / batchSize) == 0)
+            {
+                std::cout << std::format("Iter {} ", iter_num);
+                nn.printLoss();
+                nn.printOutput();
+            }
+        }
+    }
+}
