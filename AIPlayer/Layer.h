@@ -20,7 +20,23 @@ import <string>;
 class Layer
 {
 public:
-	Layer(cudnnHandle_t& handle, Layer* previousLayer, bool verbose = false, std::string name = "");
+    enum class VERBOSITY
+    {
+        MIN = 0,
+        ERROR,
+        INFO,
+        WARNING,
+        DEBUG,
+
+        MAX
+    };
+
+	Layer(cudnnHandle_t& handle, 
+        Layer* previousLayer,
+        const Hyperparameters& hyperparameters,
+        bool verbose = false, 
+        std::string name = "",
+        VERBOSITY verbosityLevel = VERBOSITY::ERROR);
 	virtual ~Layer();
 
     template <typename T_ELEM>
@@ -111,6 +127,7 @@ protected:
 
 	cudnnHandle_t& mHandle;
 	bool mVerbose;
+    VERBOSITY mVerbosityLevel;
 
 	std::unique_ptr<Surface<float>> mOutputSurface;
 	std::unique_ptr<Surface<float>> mGradSurface;
@@ -133,4 +150,6 @@ protected:
     Layer* mPreviousLayer;
 
 	std::string mName;
+
+    const Hyperparameters& mHyperparameters;
 };

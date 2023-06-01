@@ -9,6 +9,7 @@ public:
 	Input(cudnnHandle_t& handle,
 		int64_t nbDims,
 		int64_t dims[],
+		const Hyperparameters& hyperparameters,
 		bool verbose = false,
 		std::string name = "Input");
 
@@ -16,6 +17,8 @@ public:
 
 	void propagateForward() override;
 	void propagateBackward() override {} // do nothing
+
+	void printOutput() override;
 
 private:
 	const int64_t mNbDims;

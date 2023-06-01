@@ -25,3 +25,41 @@ namespace Utils
 
     cudnn_frontend::Tensor flattenTensor(cudnn_frontend::Tensor& tensor, int64_t id);
 }
+
+struct Hyperparameters
+{
+    enum class UpdateType
+    {
+        SGD,
+        mSGD,
+        ADAM
+    };
+
+    UpdateType updateType = UpdateType::SGD;
+
+    cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
+    cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
+
+    int64_t nbDims = 4;
+
+    struct
+    {
+        float alpha = 0.001; // value from ADAM paper
+        //float alpha = 0.00001; // value from DIM paper
+        float alpha_t; // this will be calcualted at each step
+        float beta1 = 0.9;
+        float beta2 = 0.999;
+        float epsilon = 1.0e-8;
+        float epsilon_t;
+        size_t t = 0;
+    } adam;
+
+    struct
+    {
+        float momentum = 0.9; // momentum
+        float L2 = 0.0005; // L2 or weight decay
+        float lr = 0.001; // learning rate
+        size_t t = 0;
+    } msgd;
+
+};

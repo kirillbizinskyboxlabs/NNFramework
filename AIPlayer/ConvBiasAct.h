@@ -8,6 +8,7 @@ public:
 		const int64_t kernelSize,
 		const int64_t filterSize,
 		Layer* previousLayer,
+		const Hyperparameters& hyperparameters,
 		const float& learningRate,
 		const int64_t convPad = 2,
 		bool training = true,
@@ -27,6 +28,9 @@ private:
 
 	void _printBias();
 	void _printFilter();
+	void _printActivationGrad();
+	void _printBiasGrad();
+	void _printFilterGrad();
 
 	std::unique_ptr<Surface<float>> mWeightsSurface;
 	std::unique_ptr<Surface<float>> mBiasSurface;
@@ -59,5 +63,13 @@ private:
 
 	int64_t mActivationGradWorkspaceSize;
 	void* mActivationGradWorkspacePtr;
+
+	struct // mSGD parameters
+	{
+		//float* d_v_f = nullptr;
+		//float* d_v_b = nullptr;
+		std::unique_ptr<Surface<float>> mGradBiasVelocitySurface;
+		std::unique_ptr<Surface<float>> mGradFilterVelocitySurface;
+	} mSGD;
 };
 

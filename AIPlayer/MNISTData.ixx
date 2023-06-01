@@ -70,13 +70,29 @@ public:
             current = 0;
         }
 
+        //std::cout << std::format("Size: {} current: {}", images.size(), current) << std::endl;
+
+        //for (auto&& im : images)
+        //{
+        //    for (auto&& px : im)
+        //    {
+        //        std::cout << std::format("{} ", static_cast<float>(px) / 255.0f);
+        //    }
+        //    
+        //}
+
+
         for (uint32_t i = 0; i < batchSize; ++i)
         {
             const uint32_t imageSize = num_rows * num_cols;
             for (uint32_t j = 0; j < imageSize; ++j)
             {
                 size_t px = imageSize * i + j;
-                dataPtr[px] = (static_cast<T>(images[current + i][j])) / 255.0f;
+                //dataPtr[px] = (static_cast<T>(images[current + i][j])) / 255.0f;
+                auto converted = static_cast<float>(images[current + i][j]) / 255.0f;
+                dataPtr[px] = converted;
+                //std::cout << std::format("{} ", dataPtr[px]);
+                //std::cout << std::format("converted: {} dataPtr[{}]: {} images:{}", converted, px, dataPtr[px], static_cast<int>(images[current + i][j]));
             }
 
             constexpr size_t numClasses = 10; // can be member var
@@ -104,7 +120,7 @@ public:
 private:
     std::vector<std::vector<uint8_t>> images;
     std::vector<uint8_t> labels;
-    uint32_t current;
+    uint32_t current = 0;
     uint32_t num_images;
     uint32_t num_rows;
     uint32_t num_cols;

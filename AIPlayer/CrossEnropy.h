@@ -6,7 +6,11 @@ import <ranges>;
 class CrossEntropy : public Layer
 {
 public:
-	CrossEntropy(cudnnHandle_t& handle, Layer* previousLayer, bool verbose = false, std::string name = "CrossEntropy");
+	CrossEntropy(cudnnHandle_t& handle, 
+		Layer* previousLayer, 
+		const Hyperparameters& hyperparameters, 
+		bool verbose = false, 
+		std::string name = "CrossEntropy");
 	~CrossEntropy();
 
 	void printOutput() override;

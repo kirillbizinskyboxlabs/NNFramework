@@ -6,9 +6,10 @@ import <iostream>;
 
 Pool::Pool(cudnnHandle_t& handle, 
     Layer* previousLayer, 
+    const Hyperparameters& hyperparameters,
     bool verbose,
     std::string name)
-    : Layer(handle, previousLayer, verbose, std::move(name))
+    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name))
 {
     int64_t poolTensorDim[] = { 0, 0, 0, 0 };
     auto& inputTensor = mPreviousLayer->getOutputTensor();
@@ -96,68 +97,6 @@ Pool::Pool(cudnnHandle_t& handle,
 
         if (mVerbose) std::cout << "Setting forward propagation" << std::endl;
         _setForwardPropagationPlan(ops, data_ptrs, uids);
-
-        // backpropagation
-        //auto gradTensor = cudnn_frontend::TensorBuilder()
-        //    .setAlignment(alignment)
-        //    .setDataType(dataType)
-        //    .setDim(nbDims, inputDim)
-        //    .setStride(nbDims, inputTensor.getStride())
-        //    .setId(generateTensorId())
-        //    .build();
-
-        //auto inputGradTensor = cudnn_frontend::TensorBuilder()
-        //    .setDim(nbDims, inputTensor.getDim())
-        //    .setStride(nbDims, inputTensor.getStride())
-        //    .setId(generateTensorId())
-        //    .setAlignment(alignment)
-        //    .setDataType(dataType)
-        //    .build();
-
-        //auto gradTensor = cudnn_frontend::TensorBuilder()
-        //    .setDim(nbDims, mOutputTensor->getDim())
-        //    .setStride(nbDims, mOutputTensor->getStride())
-        //    .setId(generateTensorId())
-        //    .setAlignment(alignment)
-        //    .setDataType(dataType)
-        //    .build();
-
-        //auto poolBwdDesc = cudnn_frontend::ResampleDescBuilder()
-        //    .setComputeType(dataType)
-        //    .setNanPropagation(nanOpt)
-        //    .setResampleMode(mode)
-        //    .setPaddingMode(padding_mode)
-        //    .setSpatialDim(nbSpatialDims, windowDimPool)
-        //    .setSpatialStride(nbSpatialDims, stridePool)
-        //    .setPrePadding(nbSpatialDims, prePaddingPool)
-        //    .setPostPadding(nbSpatialDims, postPaddingPool)
-        //    .build();
-
-        //// Create a Resample Node
-        //auto pool_bwd_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_RESAMPLE_BWD_DESCRIPTOR)
-        //    .setdyDesc(inputGradTensor) // gradTensor gradient on PREVIOUS Layer // TODO: fix naming
-        //    //.setxDesc(inputTensor)
-        //    .setdxDesc(gradTensor)
-        //    .setResampleDesc(poolBwdDesc)
-        //    .setAlpha(alpha)
-        //    .setBeta(beta)
-        //    .build();
-        //if (mVerbose) std::cout << pool_bwd_op.describe() << std::endl;
-
-        //std::vector<cudnn_frontend::Operation const*> ops_bwd = { &pool_bwd_op };
-        //std::vector<void*> data_ptrs_bwd;
-        ////data_ptrs.emplace_back(mPreviousLayer->getOutputSurface().devPtr);
-        //data_ptrs_bwd.emplace_back(mPreviousLayer->getGradSurface().devPtr);
-        //data_ptrs_bwd.emplace_back(mGradSurface->devPtr);
-
-        //std::vector<int64_t> uids_bwd;
-        ////uids.emplace_back(inputTensor.getId());
-        //uids_bwd.emplace_back(inputGradTensor.getId());
-        //uids_bwd.emplace_back(gradTensor.getId());
-
-        //std::cout << "Setting back propagation" << std::endl;
-        //_setPlan(ops_bwd, data_ptrs_bwd, uids_bwd, mDataGradPlan, mDataGradVariantPack, mDataGradWorkspaceSize, mDataGradWorkspacePtr);
-
     }
     catch (cudnn_frontend::cudnnException& e) {
         std::cout << "[ERROR] Exception " << e.what() << std::endl;

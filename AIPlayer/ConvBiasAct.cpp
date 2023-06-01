@@ -2,6 +2,7 @@
 
 import <format>;
 import <iostream>;
+import <random>;
 #include <iomanip>
 
 
@@ -9,13 +10,14 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
     const int64_t kernelSize,
     const int64_t filterSize,
     Layer* previousLayer,
+    const Hyperparameters& hyperparameters,
     const float& learningRate,
     const int64_t convPad,
     bool training,
     bool needDataGrad,
     bool verbose,
     std::string name)
-    : Layer(handle, previousLayer, verbose, std::move(name))
+    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name))
     , mLearningRate(learningRate)
     , mNeedDataGrad(needDataGrad)
 {
@@ -54,12 +56,25 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
     int64_t Ysize = yTensorDim[0] * yTensorDim[1] * yTensorDim[2] * yTensorDim[3];
 
+    constexpr float biasStartValue = 0.1f;
+
     mWeightsSurface = std::make_unique<Surface<float>>(wTensorDim[0] * wTensorDim[1] * wTensorDim[2] * wTensorDim[3]);
-    mBiasSurface = std::make_unique<Surface<float>>(bTensorDim[0] * bTensorDim[1] * bTensorDim[2] * bTensorDim[3]);
+    mBiasSurface = std::make_unique<Surface<float>>(bTensorDim[0] * bTensorDim[1] * bTensorDim[2] * bTensorDim[3], biasStartValue);
     mOutputSurface = std::make_unique<Surface<float>>(Ysize, 0.0f);
 
-    mGradSurface = std::make_unique<Surface<float>>(Ysize, 0.0f);
-    //mBiasGradSurface = std::make_unique<Surface<float>>(mBiasSurface->n_elems);
+    // Xavier filter values
+    std::random_device dev;
+    std::mt19937 gen(dev());
+    const float deviation = sqrt(3.0f / (inputDim[1] * kernelSize * kernelSize)); // input channels * KS^2
+    //const float deviation = 1.0f / (inputDim[1] * kernelSize * kernelSize); // input channels * KS^2
+    std::uniform_real_distribution<float> distribution(-deviation, deviation);
+
+    for (int64_t i = 0; i < mWeightsSurface->n_elems; ++i)
+    {
+        mWeightsSurface->hostPtr[i] = distribution(gen);
+    }
+
+    mWeightsSurface->hostToDevSync();
 
     try
     {
@@ -197,10 +212,12 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
     if (training)
     {
+        mGradSurface = std::make_unique<Surface<float>>(Ysize, 0.0f);
+
         Utils::checkCudnnError(cudnnCreateFilterDescriptor(&mFilterDesc));
         Utils::checkCudnnError(cudnnSetFilter4dDescriptor(mFilterDesc,
-            /*dataType=*/CUDNN_DATA_FLOAT,
-            /*format=*/CUDNN_TENSOR_NHWC,
+            /*dataType=*/dataType,
+            /*format=*/tensorFormat,
             /*out_channels=*/filterSize,
             /*in_channels=*/inputDim[1],
             /*kernel_height=*/kernelSize,
@@ -208,8 +225,8 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
         Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mBiasGradTensorDesc));
         Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mBiasGradTensorDesc,
-            CUDNN_TENSOR_NHWC,
-            CUDNN_DATA_FLOAT,
+            tensorFormat,
+            dataType,
             1, filterSize,
             1, 1));
 
@@ -222,7 +239,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
             /*dilation_height=*/1,
             /*dilation_width=*/1,
             /*mode=*/CUDNN_CROSS_CORRELATION,
-            /*computeType=*/CUDNN_DATA_FLOAT));
+            /*computeType=*/dataType));
 
         //cudnnGetConvolutionBackwardDataAlgorithm_v7
         //cudnnConvolutionBwdDataPreference_t bwdDPref;
@@ -315,39 +332,18 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
 void ConvBiasAct::propagateBackward()
 {
-    ////std::cout << "Reducing tensor" << std::endl;
-    //Utils::checkCudnnError(cudnnReduceTensor(
-    //    /*cudnnHandle_t */                          mHandle,
-    //    /*const cudnnReduceTensorDescriptor_t*/     mReduceTensorDesc,
-    //    /*void**/ nullptr,
-    //    /*size_t*/                                  0,
-    //    /*void**/ mBiasGradWorkspacePtr,
-    //    /*size_t*/                                  mBiasGradWorkspaceSize,
-    //    /*const void**/ &alpha,
-    //    /*const cudnnTensorDescriptor_t*/           mGradTensorDesc,
-    //    /*const void**/ mGradSurface->devPtr,
-    //    /*const void**/ &beta,
-    //    /*const cudnnTensorDescriptor_t*/           mBiasGradTensorDesc,
-    //    /*void**/ mBiasGradSurface->devPtr));
-
-    //// SGD
-    //// update bias
-    //Utils::checkCudaError(cublasSaxpy(mBiasGradSurface->n_elems,
-    //    -epsilon, // learning rate
-    //    mBiasGradSurface->devPtr, 1,
-    //    B->devPtr, 1));
-
     Utils::checkCudnnError(cudnnBackendExecute(mHandle, mActivationGradPlan->get_raw_desc(), mActivationGradVariantPack->get_raw_desc()));
 
     if (mVerbose)
     {
-        std::cout << std::format("Propagating backwards on {}", mName) << std::endl;
+        std::cout << std::format("Propagating backwards on {}, learning rate: {}", mName, mLearningRate) << std::endl;
 
         _printBias();
         _printFilter();
+        _printActivationGrad();
     }
 
-    float alpha = 1.0f, beta = 0.0f; // not sure, maybe it can be a nn member
+     float alpha = 1.0f, beta = 0.0f; // not sure, maybe it can be a nn member
 
     Utils::checkCudnnError(cudnnConvolutionBackwardBias(
         mHandle, 
@@ -375,12 +371,18 @@ void ConvBiasAct::propagateBackward()
         mFilterDesc,
         mWeightsGradSurface->devPtr));
 
+    if (mVerbose)
+    {
+        _printBiasGrad();
+        _printFilterGrad();
+    }
+
     if (mNeedDataGrad)
     {
         Utils::checkCudnnError(cudnnConvolutionBackwardData(mHandle, 
             &alpha, 
             mFilterDesc,
-            mWeightsGradSurface->devPtr,
+            mWeightsSurface->devPtr,
             mGradTensorDesc,
             //mGradSurface->devPtr,
             mActivationGradSurface->devPtr,
@@ -392,10 +394,11 @@ void ConvBiasAct::propagateBackward()
             mInputTensorDesc,
             mPreviousLayer->getGradSurface().devPtr));
     }
+
     // Update weights
-    if (true) // SGD
+    if (mHyperparameters.updateType == Hyperparameters::UpdateType::SGD) // SGD
     {
-        alpha = -mLearningRate;
+        float alpha = -mLearningRate; // TODO: change name
         cublasSaxpy(
             //nn->cublasHandle, 
             mWeightsSurface->n_elems,
@@ -410,6 +413,59 @@ void ConvBiasAct::propagateBackward()
             mBiasGradSurface->devPtr, 1,
             mBiasSurface->devPtr, 1);
     }
+    else if (mHyperparameters.updateType == Hyperparameters::UpdateType::mSGD)
+    {
+        //std::cout << out_channels << " backprop mSGD\n";
+        //show_some_data(filter_data, 10);
+        cublasSscal(
+            mWeightsSurface->n_elems,
+            mHyperparameters.msgd.momentum, 
+            mSGD.mGradFilterVelocitySurface->devPtr, 
+            1); // v = momentum * v
+        alpha = -mHyperparameters.msgd.L2 * mHyperparameters.msgd.lr; // alpha = -L2*epsilon
+        cublasSaxpy(
+            mWeightsSurface->n_elems,
+            alpha, 
+            mWeightsSurface->devPtr, 1,
+            mSGD.mGradFilterVelocitySurface->devPtr, 1); // v = -L2*epsilon*w + v
+        alpha = -mHyperparameters.msgd.lr; // alpha = -epsilon
+        cublasSaxpy(
+            mWeightsSurface->n_elems,
+            alpha, 
+            mWeightsGradSurface->devPtr, 1,
+            mSGD.mGradFilterVelocitySurface->devPtr, 1); // v = -epsilon*grad + v
+        alpha = 1;
+        cublasSaxpy(
+            mWeightsSurface->n_elems,
+            alpha, 
+            mSGD.mGradFilterVelocitySurface->devPtr, 1,
+            mWeightsSurface->devPtr, 1); // w = v + w
+        //show_some_data(filter_data, 10);
+
+        // bias
+        cublasSscal(
+            mBiasSurface->n_elems,
+            mHyperparameters.msgd.momentum, 
+            mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = momentum * v
+        alpha = -mHyperparameters.msgd.L2 * mHyperparameters.msgd.lr; // alpha = -L2*epsilon
+        cublasSaxpy(
+            mBiasSurface->n_elems,
+            alpha, 
+            mBiasSurface->devPtr, 1,
+            mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = -L2*epsilon*w + v
+        alpha = -mHyperparameters.msgd.lr; // alpha = -epsilon
+        cublasSaxpy(
+            mBiasSurface->n_elems,
+            alpha, 
+            mBiasGradSurface->devPtr, 1,
+            mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = -epsilon*grad + v
+        alpha = 1;
+        cublasSaxpy(
+            mBiasSurface->n_elems,
+            alpha, 
+            mSGD.mGradBiasVelocitySurface->devPtr, 1,
+            mBiasSurface->devPtr, 1); // w = v + w
+    }
 
     if (mVerbose)
     {
@@ -420,9 +476,16 @@ void ConvBiasAct::propagateBackward()
 
 void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
 {
+    mGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
     mBiasGradSurface = std::make_unique<Surface<float>>(mBiasSurface->n_elems, 0.0f);
     mWeightsGradSurface = std::make_unique<Surface<float>>(mWeightsSurface->n_elems, 0.0f);
     mActivationGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
+
+    if (mHyperparameters.updateType == Hyperparameters::UpdateType::mSGD)
+    {
+        mSGD.mGradBiasVelocitySurface = std::make_unique<Surface<float>>(mBiasSurface->n_elems, 0.0f);
+        mSGD.mGradFilterVelocitySurface = std::make_unique<Surface<float>>(mWeightsSurface->n_elems, 0.0f);
+    }
 
     try
     {
@@ -550,6 +613,7 @@ void ConvBiasAct::_setupDataBackPropagation()
 
 void ConvBiasAct::_printBias()
 {
+    std::cout << std::format("{} bias:", mName) << std::endl;
     mBiasSurface->devToHostSync();
 
     for (int64_t b = 0; b < mBiasSurface->n_elems; ++b)
@@ -562,11 +626,51 @@ void ConvBiasAct::_printBias()
 
 void ConvBiasAct::_printFilter()
 {
+    std::cout << std::format("{} filter with {} elements:", mName, mWeightsSurface->n_elems) << std::endl;
     mWeightsSurface->devToHostSync();
 
-    for (int64_t w = 0; w < std::min(mWeightsSurface->n_elems, 10ll); ++w)
+    for (int64_t w = 0; w < std::min(mWeightsSurface->n_elems, 100ll); ++w)
     {
         std::cout << std::format("{} ", mWeightsSurface->hostPtr[w]);
+    }
+
+    std::cout << std::endl;
+}
+
+void ConvBiasAct::_printActivationGrad()
+{
+    std::cout << std::format("{} mActivationGradSurface:", mName) << std::endl;
+    mActivationGradSurface->devToHostSync();
+
+    for (int64_t b = 0; b < mActivationGradSurface->n_elems; ++b)
+    {
+        std::cout << std::format("{} ", mActivationGradSurface->hostPtr[b]);
+    }
+
+    std::cout << std::endl;
+}
+
+void ConvBiasAct::_printBiasGrad()
+{
+    std::cout << std::format("{} mBiasGradSurface:", mName) << std::endl;
+    mBiasGradSurface->devToHostSync();
+
+    for (int64_t b = 0; b < mBiasGradSurface->n_elems; ++b)
+    {
+        std::cout << std::format("{} ", mBiasGradSurface->hostPtr[b]);
+    }
+
+    std::cout << std::endl;
+}
+
+void ConvBiasAct::_printFilterGrad()
+{
+    std::cout << std::format("{} mWeightsGradSurface:", mName) << std::endl;
+    mWeightsGradSurface->devToHostSync();
+
+    for (int64_t b = 0; b < std::min(mWeightsGradSurface->n_elems, 1000ll); ++b)
+    {
+        std::cout << std::format("{} ", mWeightsGradSurface->hostPtr[b]);
     }
 
     std::cout << std::endl;

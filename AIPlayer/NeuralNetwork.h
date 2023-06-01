@@ -5,6 +5,7 @@ import <string>;
 import <ranges>;
 
 #include <cudnn.h>
+#include "DevUtils.h"
 
 class Layer;
 
@@ -14,7 +15,10 @@ public:
 	enum class VERBOSITY
 	{
 		MIN = 0,
-		LEVEL1,
+		ERROR,
+		INFO,
+		WARNING,
+		DEBUG,
 
 		MAX
 	};
@@ -38,6 +42,7 @@ public:
 
 	float* getInputDataPtr();
 	float* getLabelDataPtr();
+	void syncData();
 	void syncLabel();
 	void setLabel(std::span<uint8_t> labels); // should it also be a responsibility of a user??
 
@@ -46,6 +51,9 @@ public:
 
 	void printLoss();
 	void printOutput();
+
+	// temporary public
+	Hyperparameters mHyperparameters;
 
 private:
 	cudnnHandle_t mHandle;

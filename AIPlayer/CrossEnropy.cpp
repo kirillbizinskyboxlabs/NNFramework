@@ -5,9 +5,10 @@ import <format>;
 
 CrossEntropy::CrossEntropy(cudnnHandle_t& handle, 
     Layer* previousLayer, 
+    const Hyperparameters& hyperparameters,
     bool verbose, 
     std::string name)
-    : Layer(handle, previousLayer, verbose, std::move(name))
+    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name))
     , mGradWorkspaceSize(0)
     , mGradWorkspacePtr(nullptr)
 {
@@ -59,13 +60,15 @@ void CrossEntropy::printGrad()
 {
     mPreviousLayer->getGradSurface().devToHostSync();
 
+    constexpr int precision = 8;
+
     std::cout << "Cross Entropy derivative:" << std::endl;
 
     for (int64_t b = 0; b < mBatchSize; ++b)
     {
         for (int64_t i = 0; i < mNumClasses; ++i)
         {
-            std::cout << std::setprecision(3) << mPreviousLayer->getGradSurface().hostPtr[b * mNumClasses + i] << " ";
+            std::cout << std::setprecision(precision) << mPreviousLayer->getGradSurface().hostPtr[b * mNumClasses + i] << " ";
         }
         std::cout << std::endl;
     }

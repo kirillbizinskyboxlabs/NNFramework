@@ -12,14 +12,15 @@ import <exception>;
 
 #include <iomanip>
 
-constexpr float epsilon = 0.01f; // learning rate
-constexpr int64_t alignment = 16; //16B to make Tensor cores work
-constexpr cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-constexpr cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-constexpr int convDim = 2;
-constexpr float alpha = 1.0f;
-constexpr float beta = 0.0f;
+//constexpr float epsilon = 0.01f; // learning rate
+//constexpr int64_t alignment = 16; //16B to make Tensor cores work
+//constexpr cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
+//constexpr cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
+//constexpr int convDim = 2;
+//constexpr float alpha = 1.0f;
+//constexpr float beta = 0.0f;
 
+constexpr int precision = 8;
 
 using namespace Utils;
 
@@ -33,13 +34,15 @@ void display_flat(float* image, size_t size)
     std::cout << "\n";
 }
 
-Layer::Layer(cudnnHandle_t& handle, Layer* previousLayer, bool verbose, std::string name)
+Layer::Layer(cudnnHandle_t& handle, Layer* previousLayer, const Hyperparameters& hyperparameters, bool verbose, std::string name, VERBOSITY verbosityLevel)
     : mHandle(handle)
     , mVerbose(verbose)
     , mForwardPropagationWorkspaceSize(0)
     , mForwardPropagationWorkspacePtr(nullptr)
     , mPreviousLayer(previousLayer)
     , mName(std::move(name))
+    , mVerbosityLevel(verbosityLevel)
+    , mHyperparameters(hyperparameters)
 {
 }
 
@@ -100,33 +103,48 @@ void Layer::printOutput()
 
     mOutputSurface->devToHostSync();
 
-    /*cudaDeviceSynchronize();
-    checkCudaError(cudaMemcpy(mOutputSurface->hostPtr, mOutputSurface->devPtr, (size_t)(sizeof(mOutputSurface->hostPtr[0]) * mOutputSurface->n_elems), cudaMemcpyDeviceToHost));
-    cudaDeviceSynchronize();*/
-
     auto yDim = mOutputTensor->getDim();
     for (size_t i = 0; i < CUDNN_DIM_MAX + 1; ++i)
     {
         std::cout << std::format("yDim[{}]: {}", i, yDim[i]) << std::endl;
     }
 
-    if (yDim[2] == yDim[3])
+    auto stride = mOutputTensor->getStride();
+
+    if (yDim[2] == yDim[3] && yDim[2] != 1)
     {
-        cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-        int64_t stride[4];
-        generateStrides(yDim, stride, 4, tensorFormat);
-        for (int64_t h = 0; h < yDim[2]; ++h)
+        //cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
+        //int64_t stride[4];
+        //generateStrides(yDim, stride, 4, tensorFormat);
+        for (int64_t b = 0; b < yDim[0]; ++b)
         {
-            for (int64_t w = 0; w < yDim[3]; ++w)
+            for (int64_t c = 0; c < yDim[1]; ++c)
             {
-                std::cout << std::setw(3) << std::setprecision(3) << mOutputSurface->hostPtr[h * stride[2] + w * stride[3]] << " ";
+                for (int64_t h = 0; h < yDim[2]; ++h)
+                {
+                    for (int64_t w = 0; w < yDim[3]; ++w)
+                    {
+                        std::cout << std::setw(3) << std::setprecision(precision) << mOutputSurface->hostPtr[b*stride[0] + c*stride[1] + h * stride[2] + w * stride[3]] << " ";
+                    }
+                    std::cout << std::endl;
+                }
+                std::cout << std::endl;
             }
             std::cout << std::endl;
+            std::cout << std::endl;
         }
+        
     }
     else
     {
-        display_flat(mOutputSurface->hostPtr, yDim[1]);
+        for (int64_t b = 0; b < yDim[0]; ++b)
+        {
+            for (int64_t c = 0; c < yDim[1]; ++c)
+            {
+                std::cout << std::setw(3) << std::setprecision(precision) << mOutputSurface->hostPtr[b * stride[0] + c] << " ";
+            }
+            std::cout << std::endl;
+        }
     }
 }
 
@@ -168,7 +186,7 @@ void Layer::printGrad()
             {
                 for (int64_t w = 0; w < dims[nbDims - 1]; ++w)
                 {
-                    std::cout << mGradSurface->hostPtr[stride[0] * b + stride[nbDims - 2] * h + stride[nbDims - 1] * w] << " ";
+                    std::cout << std::setprecision(precision) << mGradSurface->hostPtr[stride[0] * b + stride[nbDims - 2] * h + stride[nbDims - 1] * w] << " ";
                 }
                 std::cout << std::endl;
             }

@@ -7,6 +7,7 @@ class Softmax : public Layer
 public:
 	Softmax(cudnnHandle_t& handle, 
 		Layer* previousLayer,
+		const Hyperparameters& hyperparameters,
 		bool verbose = false, 
 		std::string name = "Softmax");
 
@@ -22,6 +23,4 @@ private:
 	cudnnTensorDescriptor_t sftTensorDesc;
 
 	std::vector<int> mDims;
-
-	//Layer& mPrevLayer; // better? not so much
 };

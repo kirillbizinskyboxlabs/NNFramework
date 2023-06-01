@@ -13,10 +13,10 @@ namespace LeNet
 {
     void LenetForward()
     {
-        std::cout << "LeNet Test v1.0" << std::endl;
+        std::cout << "LeNet Test v1.1" << std::endl;
 
         // Hyperparameters?
-        constexpr int64_t batchSize = 512;
+        constexpr int64_t batchSize = 128;
         constexpr int64_t inputH = 28;
         constexpr int64_t inputW = 28;
         constexpr int64_t C1Features = 32;
@@ -42,29 +42,35 @@ namespace LeNet
         std::vector<size_t> dims = { 1, rows, cols };
 
         NeuralNetwork nn(batchSize, dims.size(), dims.data(), NeuralNetwork::VERBOSITY::MIN);
+        nn.mHyperparameters.updateType = Hyperparameters::UpdateType::mSGD;
+
         nn.addConvBiasAct(C1KernelSize, C1Features, C1Padding, verbose, "C1");
         nn.addPool(verbose, "S2");
         nn.addConvBiasAct(C3KernelSize, C3Features, C3Padding, verbose, "C3");
         nn.addPool(verbose, "S4");
-        nn.addConvBiasAct(C5KernelSize, C5Features, 0, verbose, "FC5");
-        //nn.addConvBiasAct(1, FC6OutputSize, 0, verbose, "FC6");
+        nn.addConvBiasAct(C5KernelSize, C5Features, C5Padding, verbose, "FC5");
+        nn.addConvBiasAct(1, FC6OutputSize, 0, verbose, "FC6");
         nn.addConvBiasAct(1, FC7OutputSize, 0, verbose, "FC7");
         nn.addSoftmax(verbose);
         nn.addCrossEntropy(verbose);
 
 
-        size_t epoch_num = 200;
+        size_t epoch_num = 20;
         size_t iter_num = epoch_num * (dh.getTrainSize() / batchSize);
+        size_t showPerBatch = 2;
+        //size_t frequency = 100;
+        //iter_num = 2;
 
 
         while (iter_num--)
         {
-            dh.loadData(batchSize, nn.getInputDataPtr(), nn.getLabelDataPtr());
+            dh.loadData<float>(batchSize, nn.getInputDataPtr(), nn.getLabelDataPtr());
             nn.syncLabel();
 
             nn.train();
 
-            if (iter_num % (dh.getTrainSize() / batchSize) == 0)
+            if (iter_num % ((dh.getTrainSize() / showPerBatch) / batchSize) == 0)
+            //if (iter_num % frequency == 0)
             {
                 std::cout << std::format("Iter {} ", iter_num);
                 nn.printLoss();

@@ -8,15 +8,12 @@ import <iostream>;
 
 Softmax::Softmax(cudnnHandle_t& handle, 
     Layer* previousLayer, 
+    const Hyperparameters& hyperparameters,
     bool verbose, 
     std::string name)
-    : Layer(handle, previousLayer, verbose, std::move(name))
-    //, mSrcSurface(prevLayer.getOutputSurface())
-    //, mPrevLayer(prevLayer)
+    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), VERBOSITY::ERROR)
 {
     // We expect to have a flatten input
-    // Since we use backend here - we won't set a frontend descriptor
-    //cudnnTensorDescriptor_t srcTensorDesc, sftTensorDesc;
 
     cudnnCreateTensorDescriptor(&srcTensorDesc);
     cudnnCreateTensorDescriptor(&sftTensorDesc);
@@ -53,6 +50,11 @@ Softmax::Softmax(cudnnHandle_t& handle,
 
     if (mVerbose) std::cout << std::endl << size << std::endl << inputTensor.describe() << std::endl;
 
+    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    {
+        std::cout << mPreviousLayer->getOutputTensor().describe() << std::endl;
+    }
+
     mOutputSurface = std::make_unique<Surface<float>>(size, 0.0f);
 
     // TODO: rethink. They are identical and can propably be used interchangeably
@@ -75,6 +77,11 @@ Softmax::Softmax(cudnnHandle_t& handle,
         .setAlignment(16)
         .setDataType(CUDNN_DATA_FLOAT)
         .build());
+
+    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    {
+        std::cout << mOutputTensor->describe() << std::endl;
+    }
 
     // gradient surface has same dimensions as the output
     mGradSurface = std::make_unique<Surface<float>>(size, 0.0f);
@@ -101,6 +108,11 @@ void Softmax::propagateForward()
     {
         std::cout << cudnnGetErrorString(status) << std::endl;
     }
+
+    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    {
+        printOutput();
+    }
 }
 
 void Softmax::printOutput()
@@ -111,6 +123,8 @@ void Softmax::printOutput()
     {
         throw;
     }
+
+    constexpr int precision = 8;
 
     mPreviousLayer->getOutputSurface().devToHostSync();
     mOutputSurface->devToHostSync();
@@ -128,13 +142,13 @@ void Softmax::printOutput()
         std::cout << std::format("X{}", i) << std::endl;
         for (size_t j = 0; j < batchStride; ++j)
         {
-            std::cout << std::setprecision(3) << mPreviousLayer->getOutputSurface().hostPtr[batchStride * i + j] << " ";
+            std::cout << std::setprecision(precision) << mPreviousLayer->getOutputSurface().hostPtr[batchStride * i + j] << " ";
         }
 
         std::cout << std::format("\nY{}", i) << std::endl;
         for (size_t j = 0; j < batchStride; ++j)
         {
-            std::cout << std::setprecision(3) << mOutputSurface->hostPtr[batchStride * i + j] << " ";
+            std::cout << std::setprecision(precision) << mOutputSurface->hostPtr[batchStride * i + j] << " ";
         }
         std::cout << std::endl;
 
@@ -153,6 +167,11 @@ void Softmax::propagateBackward()
         std::cout << "Softmax backprop" << std::endl;
     }
 
+    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    {
+        printGrad();
+    }
+
     try {
         auto status = cudnnSoftmaxBackward(
             mHandle,
@@ -161,7 +180,8 @@ void Softmax::propagateBackward()
             &alpha,
             sftTensorDesc,
             mOutputSurface->devPtr,
-            /*dyDesc*/ srcTensorDesc, // srcTensorDesc == sftTensorDesc, probably can be used interchangeably
+            //mPreviousLayer->getOutputSurface().devPtr, // not sure
+            /*dyDesc*/ sftTensorDesc, // srcTensorDesc == sftTensorDesc, probably can be used interchangeably
             /**dy*/ mGradSurface->devPtr, // we expect valid gradient to be populated. make a sanity check?
             &beta,
             srcTensorDesc, // that makes sense, right? it describes the data pointer in the other layer
@@ -175,5 +195,10 @@ void Softmax::propagateBackward()
     catch (cudnn_frontend::cudnnException& e)
     {
         std::cout << std::format("Softmax backprop failed: {}", e.what()) << std::endl;
+    }
+
+    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    {
+        printGrad();
     }
 }
