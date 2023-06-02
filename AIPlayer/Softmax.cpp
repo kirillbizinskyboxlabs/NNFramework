@@ -16,7 +16,7 @@ Softmax::Softmax(cudnnHandle_t& handle,
 {
     if (mVerbosityLevel >= VERBOSITY::INFO)
     {
-        std::cout << std::format("Creating Cross Entropy Loss Layer") << std::endl;
+        std::cout << std::format("Creating {} Layer", mName) << std::endl;
     }
 
     // We expect to have a flatten input // Add sanity check?
