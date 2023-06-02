@@ -3,4 +3,4 @@
 	url = https://github.com/NVIDIA/cudnn-frontend.git
 [submodule "games/Battleships"]
 	path = games/Battleships
-	url = git@github.com:Riottomsk/Battleships.git
+	url = git@github.com:kirillbizinskyboxlabs/Battleships.git
