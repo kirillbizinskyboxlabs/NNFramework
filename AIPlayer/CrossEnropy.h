@@ -10,12 +10,15 @@ public:
 		Layer* previousLayer, 
 		const Hyperparameters& hyperparameters, 
 		bool verbose = false, 
-		std::string name = "CrossEntropy");
+		std::string name = "CrossEntropy",
+		VERBOSITY verbosity = VERBOSITY::MIN);
 	~CrossEntropy();
 
 	void printOutput() override;
 	void printLoss();
 	void printGrad() override;
+
+	float getLoss();
 
 	//int executeInference() override { return 0; } // stubbed out since inference make little sense. Loss shouldn't be a Layer probably...
 	//void propagateForward() override;

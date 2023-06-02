@@ -62,7 +62,7 @@ void Layer::propagateForward()
         return; // not initialized
     }
 
-    if (mVerbose)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << std::format("Executing propagateForward on {}", mName.c_str()) << std::endl;
     }
@@ -202,21 +202,21 @@ void Layer::_setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
     int64_t& workspace_size,
     void*& workspace_ptr)
 {
-    if (mVerbose) std::cout << "_setPlan" << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "_setPlan" << std::endl;
 
     auto opGraph = cudnn_frontend::OperationGraphBuilder()
         .setHandle(mHandle)
         .setOperationGraph(ops.size(), ops.data())
         .build();
 
-    if (mVerbose) std::cout << opGraph.describe() << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << opGraph.describe() << std::endl;
 
     plan = std::make_unique<cudnn_frontend::ExecutionPlan>(get_execplan_from_heuristics_else_fall_back(std::move(opGraph), mHandle));
 
-    if (mVerbose) std::cout << "Plan tag: " << plan->getTag() << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Plan tag: " << plan->getTag() << std::endl;
 
     workspace_size = plan->getWorkspaceSize();
-    if (mVerbose) std::cout << plan->describe() << " requires workspace " << workspace_size << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << plan->describe() << " requires workspace " << workspace_size << std::endl;
 
     if (workspace_size > 0) {
         checkCudaError(cudaMalloc(&workspace_ptr, (size_t)workspace_size));
@@ -224,13 +224,13 @@ void Layer::_setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
 
     assert(data_ptrs.size() == uids.size());
     int64_t num_ptrs = data_ptrs.size();
-    if (mVerbose) std::cout << std::format("Num ptrs {}", num_ptrs) << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << std::format("Num ptrs {}", num_ptrs) << std::endl;
     variantPack = std::make_unique<cudnn_frontend::VariantPack>(cudnn_frontend::VariantPackBuilder()
         .setWorkspacePointer(workspace_ptr)
         .setDataPointers(num_ptrs, data_ptrs.data())
         .setUids(num_ptrs, uids.data())
         .build());
-    if (mVerbose) std::cout << "variantPack " << variantPack->describe() << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "variantPack " << variantPack->describe() << std::endl;
 }
 
 void Layer::_setForwardPropagationPlan(std::vector<cudnn_frontend::Operation const*>& ops, std::vector<void*> data_ptrs, std::vector<int64_t> uids)

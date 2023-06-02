@@ -9,7 +9,8 @@ public:
 		Layer* previousLayer,
 		const Hyperparameters& hyperparameters,
 		bool verbose = false, 
-		std::string name = "Softmax");
+		std::string name = "Softmax",
+		VERBOSITY verbosity = VERBOSITY::MIN);
 
 	//int executeInference() override;
 

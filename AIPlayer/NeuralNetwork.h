@@ -9,19 +9,31 @@ import <ranges>;
 
 class Layer;
 
+//enum class VERBOSITY
+//{
+//	MIN = 0,
+//	ERROR,
+//	INFO,
+//	WARNING,
+//	DEBUG,
+//
+//	MAX
+//};
+
+
 class NeuralNetwork
 {
 public:
-	enum class VERBOSITY
-	{
-		MIN = 0,
-		ERROR,
-		INFO,
-		WARNING,
-		DEBUG,
+	//enum class VERBOSITY
+	//{
+	//	MIN = 0,
+	//	ERROR,
+	//	INFO,
+	//	WARNING,
+	//	DEBUG,
 
-		MAX
-	};
+	//	MAX
+	//};
 
 	NeuralNetwork(size_t batchSize, 
 				  size_t nbDims, 
@@ -51,6 +63,8 @@ public:
 
 	void printLoss();
 	void printOutput();
+
+	float getLoss();
 
 	// temporary public
 	Hyperparameters mHyperparameters;

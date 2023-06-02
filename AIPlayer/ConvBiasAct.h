@@ -14,7 +14,8 @@ public:
 		bool training = true,
 		bool needDataGrad = true,
 		bool verbose = false,
-		std::string name = "ConvBiasAct");
+		std::string name = "ConvBiasAct",
+		VERBOSITY verbosity = VERBOSITY::MIN);
 	ConvBiasAct(const ConvBiasAct&) = delete;
 	ConvBiasAct& operator=(const ConvBiasAct&) = delete;
 	~ConvBiasAct() = default;

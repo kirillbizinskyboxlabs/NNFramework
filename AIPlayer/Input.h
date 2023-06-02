@@ -10,6 +10,7 @@ public:
 		int64_t nbDims,
 		int64_t dims[],
 		const Hyperparameters& hyperparameters,
+		VERBOSITY verbosity = VERBOSITY::MIN,
 		bool verbose = false,
 		std::string name = "Input");
 

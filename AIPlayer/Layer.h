@@ -1,36 +1,25 @@
 #pragma once
 
-//#include <cudnn.h>
 #include "DevUtils.h"
 
 import <vector>;
 import <memory>;
 import <string>;
 
-//class cudnnHandle_t;
-
-//namespace cudnn_frontend
+//enum class VERBOSITY
 //{
-//	class Tensor;
-//	class Operation;
-//	class ExecutionPlan;
-//	class VariantPack;
-//}
+//    MIN = 0,
+//    ERROR,
+//    INFO,
+//    WARNING,
+//    DEBUG,
+//
+//    MAX
+//};
 
 class Layer
 {
 public:
-    enum class VERBOSITY
-    {
-        MIN = 0,
-        ERROR,
-        INFO,
-        WARNING,
-        DEBUG,
-
-        MAX
-    };
-
 	Layer(cudnnHandle_t& handle, 
         Layer* previousLayer,
         const Hyperparameters& hyperparameters,

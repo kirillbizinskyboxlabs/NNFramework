@@ -10,10 +10,16 @@ Softmax::Softmax(cudnnHandle_t& handle,
     Layer* previousLayer, 
     const Hyperparameters& hyperparameters,
     bool verbose, 
-    std::string name)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), VERBOSITY::ERROR)
+    std::string name,
+    VERBOSITY verbosity)
+    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
 {
-    // We expect to have a flatten input
+    if (mVerbosityLevel >= VERBOSITY::INFO)
+    {
+        std::cout << std::format("Creating Cross Entropy Loss Layer") << std::endl;
+    }
+
+    // We expect to have a flatten input // Add sanity check?
 
     cudnnCreateTensorDescriptor(&srcTensorDesc);
     cudnnCreateTensorDescriptor(&sftTensorDesc);
@@ -27,30 +33,16 @@ Softmax::Softmax(cudnnHandle_t& handle,
     //assert(nbDims == inputTensor.getDimCount());
 
     auto inputDim = inputTensor.getDim();
-    //int nbDims = inputTensor.getDimCount();
     auto inputStride = inputTensor.getStride();
-    //std::vector<int> stride;
-    //// We don't expect to have more than INT_MAX elements in dimensions, so this should be safe... Rigth?
-    //for (int64_t d = 0; d < nbDims; ++d)
-    //{
-    //    mDims.emplace_back(static_cast<int>(inputDim[d]));
-    //    stride.emplace_back(static_cast<int>(inputStride[d]));
-
-    //    std::cout << std::format("{} {}, ", mDims.back(), stride.back());
-    //}
 
     mDims = { static_cast<int>(inputDim[0]), static_cast<int>(inputDim[1]), static_cast<int>(inputDim[2]) };
     int stride[] = { mDims[1] * mDims[2] , mDims[2], 1 };
-
-
-    //mDims = { static_cast<int>(inputDim[0]), static_cast<int>(inputDim[1]), static_cast<int>(inputDim[2]) };
-    //int stride[] = { mDims[1] * mDims[2] , mDims[2], 1 };
-    
+   
     int64_t size = std::accumulate(mDims.begin(), mDims.end(), 1ll, std::multiplies<int64_t>());
 
-    if (mVerbose) std::cout << std::endl << size << std::endl << inputTensor.describe() << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::DEBUG) std::cout << std::endl << size << std::endl << inputTensor.describe() << std::endl;
 
-    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    if (mVerbosityLevel == VERBOSITY::REACH_INFO)
     {
         std::cout << mPreviousLayer->getOutputTensor().describe() << std::endl;
     }
@@ -78,7 +70,7 @@ Softmax::Softmax(cudnnHandle_t& handle,
         .setDataType(CUDNN_DATA_FLOAT)
         .build());
 
-    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    if (mVerbosityLevel == VERBOSITY::REACH_INFO)
     {
         std::cout << mOutputTensor->describe() << std::endl;
     }
@@ -89,7 +81,7 @@ Softmax::Softmax(cudnnHandle_t& handle,
 
 void Softmax::propagateForward()
 {
-    if (mVerbose) std::cout << "Softmax propagate Forward" << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::DEBUG) std::cout << "Softmax propagate Forward" << std::endl;
     // TODO: Proper defaults
     constexpr float alpha = 1.0f;
     constexpr float beta = 0.0f;
@@ -104,12 +96,12 @@ void Softmax::propagateForward()
         sftTensorDesc,
         mOutputSurface->devPtr);
 
-    if (mVerbose)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << cudnnGetErrorString(status) << std::endl;
     }
 
-    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         printOutput();
     }
@@ -161,13 +153,12 @@ void Softmax::propagateBackward()
     constexpr float alpha = 1.0f;
     constexpr float beta = 0.0f;
 
-    //printGrad();
-    if (mVerbose)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << "Softmax backprop" << std::endl;
     }
 
-    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         printGrad();
     }
@@ -180,7 +171,6 @@ void Softmax::propagateBackward()
             &alpha,
             sftTensorDesc,
             mOutputSurface->devPtr,
-            //mPreviousLayer->getOutputSurface().devPtr, // not sure
             /*dyDesc*/ sftTensorDesc, // srcTensorDesc == sftTensorDesc, probably can be used interchangeably
             /**dy*/ mGradSurface->devPtr, // we expect valid gradient to be populated. make a sanity check?
             &beta,
@@ -197,7 +187,7 @@ void Softmax::propagateBackward()
         std::cout << std::format("Softmax backprop failed: {}", e.what()) << std::endl;
     }
 
-    if (mVerbosityLevel == VERBOSITY::DEBUG)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         printGrad();
     }

@@ -7,11 +7,17 @@ CrossEntropy::CrossEntropy(cudnnHandle_t& handle,
     Layer* previousLayer, 
     const Hyperparameters& hyperparameters,
     bool verbose, 
-    std::string name)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name))
+    std::string name,
+    VERBOSITY verbosity)
+    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
     , mGradWorkspaceSize(0)
     , mGradWorkspacePtr(nullptr)
 {
+    if (mVerbosityLevel >= VERBOSITY::INFO)
+    {
+        std::cout << std::format("Creating Cross Entropy Loss Layer") << std::endl;
+    }
+
     _initLoss();
     _initGrad();
 }
@@ -51,9 +57,11 @@ void CrossEntropy::printOutput()
 
 void CrossEntropy::printLoss()
 {
-    mLossSurface->devToHostSync();
+    //mLossSurface->devToHostSync();
 
-    std::cout << std::format("Loss: {}", -1 * mLossSurface->hostPtr[0] / mBatchSize) << std::endl;
+    auto loss = getLoss();
+
+    std::cout << std::format("Loss: {}", loss) << std::endl;
 }
 
 void CrossEntropy::printGrad()
@@ -74,9 +82,16 @@ void CrossEntropy::printGrad()
     }
 }
 
+float CrossEntropy::getLoss()
+{
+    mLossSurface->devToHostSync();
+
+    return -1 * mLossSurface->hostPtr[0] / mBatchSize;
+}
+
 void CrossEntropy::propagateBackward()
 {
-    if (mVerbose) std::cout << "Back Propagating on CrossEntropy" << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::DEBUG) std::cout << "Back Propagating on CrossEntropy" << std::endl;
     calculateGrad();
 }
 
@@ -88,7 +103,7 @@ void CrossEntropy::calculateLoss()
         throw;
     }
 
-    if (mVerbose) 
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << "calculateLoss" << std::endl;
     }
@@ -179,7 +194,7 @@ void CrossEntropy::_initLoss()
 
     using namespace cudnn_frontend;
 
-    if (mVerbose) std::cout << inputTensor.describe() << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << inputTensor.describe() << std::endl;
 
     try
     {
@@ -190,7 +205,7 @@ void CrossEntropy::_initLoss()
             .setStride(nbDims, crossEntropyLabelStride)
             .setId(generateTensorId())
             .build();
-        if (mVerbose) std::cout << crossEntropyLabelTensor.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << crossEntropyLabelTensor.describe() << std::endl;
 
         auto afterProductTensor = TensorBuilder()
             .setDataType(dataType)
@@ -200,7 +215,7 @@ void CrossEntropy::_initLoss()
             .setId(generateTensorId())
             //.setVirtual(true) // apparently it cannot be virtual 
             .build();
-        if (mVerbose) std::cout << afterProductTensor.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << afterProductTensor.describe() << std::endl;
 
         auto afterLogTensor = TensorBuilder()
             .setDataType(dataType)
@@ -210,7 +225,7 @@ void CrossEntropy::_initLoss()
             .setId(generateTensorId())
             .setVirtual(true)
             .build();
-        if (mVerbose) std::cout << afterLogTensor.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << afterLogTensor.describe() << std::endl;
 
         // the output
         auto lossTensor = TensorBuilder()
@@ -220,49 +235,49 @@ void CrossEntropy::_initLoss()
             .setStride(nbDims, lossStride)
             .setId(generateTensorId())
             .build();
-        if (mVerbose) std::cout << lossTensor.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << lossTensor.describe() << std::endl;
 
         // loss ops
 
         auto matmulDesc = cudnn_frontend::MatMulDescBuilder().setComputeType(CUDNN_DATA_FLOAT).build();
         // Create a matmul Node
-        if (mVerbose) std::cout << "Matmul" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Matmul" << std::endl;
         auto matmul_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR)
             .setaMatDesc(inputTensor)
             .setbMatDesc(crossEntropyLabelTensor)
             .setcMatDesc(afterProductTensor)
             .setmatmulDesc(matmulDesc)
             .build();
-        if (mVerbose) std::cout << matmul_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << matmul_op.describe() << std::endl;
 
         auto pwLogDesc = PointWiseDescBuilder()
             .setMode(CUDNN_POINTWISE_LOG)
             .setComputeType(dataType)
             .build();
-        if (mVerbose) std::cout << pwLogDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << pwLogDesc.describe() << std::endl;
 
-        if (mVerbose) std::cout << "pwLog_op" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "pwLog_op" << std::endl;
         auto pwLog_op = OperationBuilder(CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
             .setxDesc(matmul_op.getOutputTensor())
             .setyDesc(afterLogTensor)
             .setpwDesc(pwLogDesc)
             .build();
-        if (mVerbose) std::cout << pwLog_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << pwLog_op.describe() << std::endl;
 
-        if (mVerbose) std::cout << "sumReductionDesc" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "sumReductionDesc" << std::endl;
         auto sumReductionDesc = ReductionDescBuilder()
             .setComputeType(dataType)
             .setReductionOp(CUDNN_REDUCE_TENSOR_ADD)
             .build();
-        if (mVerbose) std::cout << sumReductionDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << sumReductionDesc.describe() << std::endl;
 
-        if (mVerbose) std::cout << "sumReduction_op" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "sumReduction_op" << std::endl;
         auto sumReduction_op = OperationBuilder(CUDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR)
             .setxDesc(pwLog_op.getOutputTensor())
             .setyDesc(lossTensor)
             .setreductionDesc(sumReductionDesc)
             .build();
-        if (mVerbose) std::cout << sumReduction_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << sumReduction_op.describe() << std::endl;
 
         std::vector<cudnn_frontend::Operation const*> ops = { &matmul_op, &pwLog_op, &sumReduction_op };
 
@@ -302,7 +317,7 @@ void CrossEntropy::_initGrad()
     int64_t gradDim[] = { inputDim[0], inputDim[1], inputDim[2] };
     int64_t gradStride[] = { inputDim[1] * inputDim[2], inputDim[2], 1};
 
-    if (mVerbose) std::cout << inputTensor.describe() << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << inputTensor.describe() << std::endl;
     try
     {
         auto labelTensor = TensorBuilder()
@@ -312,7 +327,7 @@ void CrossEntropy::_initGrad()
             .setDim(nbDims, gradDim)
             .setStride(nbDims, gradStride)
             .build();
-        if (mVerbose) std::cout << labelTensor.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << labelTensor.describe() << std::endl;
 
         auto gradTensor = TensorBuilder()
             .setDataType(dataType)
@@ -321,13 +336,13 @@ void CrossEntropy::_initGrad()
             .setDim(nbDims, gradDim)
             .setStride(nbDims, gradStride)
             .build();
-        if (mVerbose) std::cout << gradTensor.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << gradTensor.describe() << std::endl;
 
         auto subDesc = PointWiseDescBuilder()
             .setComputeType(dataType)
             .setMode(CUDNN_POINTWISE_SUB)
             .build();
-        if (mVerbose) std::cout << subDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << subDesc.describe() << std::endl;
 
         auto pw_sub_op = OperationBuilder(CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
             .setxDesc(inputTensor)
@@ -335,7 +350,7 @@ void CrossEntropy::_initGrad()
             .setyDesc(gradTensor)
             .setpwDesc(subDesc)
             .build();
-        if (mVerbose) std::cout << pw_sub_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << pw_sub_op.describe() << std::endl;
 
         // TODO: this block needs to be a function...
         std::vector<cudnn_frontend::Operation const*> ops = { &pw_sub_op };

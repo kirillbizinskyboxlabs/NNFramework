@@ -7,6 +7,17 @@
 #include <cudnn_frontend.h>
 //#include <cudnn_frontend_ExecutionPlan.h>
 
+enum class VERBOSITY
+{
+    MIN = 0,
+    ERROR,
+    INFO,
+    REACH_INFO,
+    DEBUG,
+
+    MAX
+};
+
 namespace Utils
 {
 	void initImage(float* image, int64_t imageSize);
@@ -44,22 +55,21 @@ struct Hyperparameters
 
     struct
     {
-        float alpha = 0.001; // value from ADAM paper
+        float alpha = 0.001f; // value from ADAM paper
         //float alpha = 0.00001; // value from DIM paper
         float alpha_t; // this will be calcualted at each step
-        float beta1 = 0.9;
-        float beta2 = 0.999;
-        float epsilon = 1.0e-8;
+        float beta1 = 0.9f;
+        float beta2 = 0.999f;
+        float epsilon = 1.0e-8f;
         float epsilon_t;
         size_t t = 0;
     } adam;
 
     struct
     {
-        float momentum = 0.9; // momentum
-        float L2 = 0.0005; // L2 or weight decay
-        float lr = 0.001; // learning rate
-        size_t t = 0;
+        float momentum = 0.9f; // momentum
+        float L2 = 0.0005f; // L2 or weight decay
+        float lr = 0.001f; // learning rate
     } msgd;
 
 };

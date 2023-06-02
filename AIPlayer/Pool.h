@@ -8,7 +8,8 @@ public:
 		Layer* previousLayer,
 		const Hyperparameters& hyperparameters,
 		bool verbose = false,
-		std::string name = "Pool");
+		std::string name = "Pool",
+		VERBOSITY verbosity = VERBOSITY::MIN);
 
 	void propagateBackward() override;
 

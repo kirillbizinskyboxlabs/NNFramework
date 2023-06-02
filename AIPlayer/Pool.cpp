@@ -8,8 +8,9 @@ Pool::Pool(cudnnHandle_t& handle,
     Layer* previousLayer, 
     const Hyperparameters& hyperparameters,
     bool verbose,
-    std::string name)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name))
+    std::string name,
+    VERBOSITY verbosity)
+    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
 {
     int64_t poolTensorDim[] = { 0, 0, 0, 0 };
     auto& inputTensor = mPreviousLayer->getOutputTensor();
@@ -25,13 +26,24 @@ Pool::Pool(cudnnHandle_t& handle,
     constexpr int64_t postPaddingPool[CUDNN_DIM_MAX] = { 0,0 };
     constexpr int64_t stridePool[CUDNN_DIM_MAX] = { 2,2 };
 
-    if (mVerbose) std::cout << std::format("After pool dims are {}, {}, {}, {}", poolTensorDim[0], poolTensorDim[1], poolTensorDim[2], poolTensorDim[3]) << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::INFO)
+    {
+        std::cout << std::format("Creating Pool Layer {}", mName) << std::endl;
+    }
+
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO)
+    {
+        std::cout << std::format("After pool dims are {}, {}, {}, {}", poolTensorDim[0], poolTensorDim[1], poolTensorDim[2], poolTensorDim[3]) << std::endl;
+    }
 
     int64_t Psize = poolTensorDim[0] * poolTensorDim[1] * poolTensorDim[2] * poolTensorDim[3];
     mOutputSurface = std::make_unique<Surface<float>>(Psize, 0.0f);
     mGradSurface = std::make_unique<Surface<float>>(Psize, 0.0f);
 
-    if (mVerbose) std::cout << inputTensor.describe() << std::endl;
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO)
+    {
+        std::cout << inputTensor.describe() << std::endl;
+    }
 
     try
     {
@@ -60,7 +72,7 @@ Pool::Pool(cudnnHandle_t& handle,
             .setAlignment(alignment)
             .setDataType(dataType)
             .build());
-        if (mVerbose) std::cout << mOutputTensor->describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << mOutputTensor->describe() << std::endl;
 
         // Define the resample descriptor
         auto poolDesc = cudnn_frontend::ResampleDescBuilder()
@@ -73,8 +85,8 @@ Pool::Pool(cudnnHandle_t& handle,
             .setPrePadding(nbSpatialDims, prePaddingPool)
             .setPostPadding(nbSpatialDims, postPaddingPool)
             .build();
-        if (mVerbose) std::cout << "Initialized Pool Desc" << std::endl;
-        if (mVerbose) std::cout << poolDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Initialized Pool Desc" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << poolDesc.describe() << std::endl;
 
         // Create a Resample Node
         auto pool_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_RESAMPLE_FWD_DESCRIPTOR)
@@ -84,7 +96,7 @@ Pool::Pool(cudnnHandle_t& handle,
             .setAlpha(alpha)
             .setBeta(beta)
             .build();
-        if (mVerbose) std::cout << pool_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << pool_op.describe() << std::endl;
 
         std::vector<cudnn_frontend::Operation const*> ops = { &pool_op };
         std::vector<void*> data_ptrs;
@@ -95,11 +107,11 @@ Pool::Pool(cudnnHandle_t& handle,
         uids.emplace_back(inputTensor.getId());
         uids.emplace_back(mOutputTensor->getId());
 
-        if (mVerbose) std::cout << "Setting forward propagation" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Setting forward propagation" << std::endl;
         _setForwardPropagationPlan(ops, data_ptrs, uids);
     }
     catch (cudnn_frontend::cudnnException& e) {
-        std::cout << "[ERROR] Exception " << e.what() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::ERROR) std::cout << "[ERROR] Exception " << e.what() << std::endl;
         assert(false);
     }
 
@@ -113,7 +125,7 @@ void Pool::propagateBackward()
         return; // not initialized
     }
 
-    if (mVerbose)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << std::format("Executing propagateForward on {}", mName.c_str()) << std::endl;
     }
@@ -165,7 +177,7 @@ void Pool::_setupGrad(int64_t poolTensorDim[])
             .setDataType(dataType)
             .build();
 
-        if (mVerbose) std::cout << "Setting poolBwdDesc" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Setting poolBwdDesc" << std::endl;
         auto poolBwdDesc = cudnn_frontend::ResampleDescBuilder()
             .setComputeType(dataType)
             .setNanPropagation(nanOpt)
@@ -176,9 +188,9 @@ void Pool::_setupGrad(int64_t poolTensorDim[])
             .setPrePadding(nbSpatialDims, prePaddingPool)
             .setPostPadding(nbSpatialDims, postPaddingPool)
             .build();
-        if (mVerbose) std::cout << poolBwdDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << poolBwdDesc.describe() << std::endl;
         // Create a Resample Node
-        if (mVerbose) std::cout << "Setting pool_bwd_op" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Setting pool_bwd_op" << std::endl;
         auto pool_bwd_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_RESAMPLE_BWD_DESCRIPTOR)
             .setdyDesc(gradTensor)
             //.setxDesc(inputTensor)
@@ -187,7 +199,7 @@ void Pool::_setupGrad(int64_t poolTensorDim[])
             .setAlpha(alpha)
             .setBeta(beta)
             .build();
-        if (mVerbose) std::cout << pool_bwd_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << pool_bwd_op.describe() << std::endl;
 
         std::vector<cudnn_frontend::Operation const*> ops_bwd = { &pool_bwd_op };
         std::vector<void*> data_ptrs_bwd;
@@ -198,11 +210,11 @@ void Pool::_setupGrad(int64_t poolTensorDim[])
         uids_bwd.emplace_back(inputGradTensor.getId());
         uids_bwd.emplace_back(gradTensor.getId());
 
-        if (mVerbose) std::cout << "Setting back propagation" << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Setting back propagation" << std::endl;
         _setPlan(ops_bwd, data_ptrs_bwd, uids_bwd, mDataGradPlan, mDataGradVariantPack, mDataGradWorkspaceSize, mDataGradWorkspacePtr);
     }
     catch (cudnn_frontend::cudnnException& e) {
-        std::cout << "[ERROR] Exception " << e.what() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::ERROR) std::cout << "[ERROR] Exception " << e.what() << std::endl;
         assert(false);
     }
 }

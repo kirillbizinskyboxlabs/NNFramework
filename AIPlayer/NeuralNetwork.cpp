@@ -24,7 +24,7 @@ NeuralNetwork::NeuralNetwork(size_t batchSize,
 		mInputDims[d + 1] = inputDims[d];
 	}
 
-	mLayers.emplace_back(new Input(mHandle, mNbDims, mInputDims.data(), mHyperparameters));
+	mLayers.emplace_back(new Input(mHandle, mNbDims, mInputDims.data(), mHyperparameters, mVerbosity));
 }
 
 NeuralNetwork::~NeuralNetwork()
@@ -45,22 +45,22 @@ void NeuralNetwork::addConvBiasAct(const int64_t kernelSize, const int64_t filte
 {
 	bool needDataGrad = mLayers.size() > 1;
 	bool mTraining = true; // TODO: move to member var
-	mLayers.emplace_back(new ConvBiasAct(mHandle, kernelSize, filterSize, mLayers.back(), mHyperparameters, mLearningRate, convPad, mTraining, needDataGrad, verbose, std::move(name)));
+	mLayers.emplace_back(new ConvBiasAct(mHandle, kernelSize, filterSize, mLayers.back(), mHyperparameters, mLearningRate, convPad, mTraining, needDataGrad, verbose, std::move(name), mVerbosity));
 }
 
 void NeuralNetwork::addPool(bool verbose, std::string name)
 {
-	mLayers.emplace_back(new Pool(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name)));
+	mLayers.emplace_back(new Pool(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name), mVerbosity));
 }
 
 void NeuralNetwork::addSoftmax(bool verbose, std::string name)
 {
-	mLayers.emplace_back(new Softmax(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name)));
+	mLayers.emplace_back(new Softmax(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name), mVerbosity));
 }
 
 void NeuralNetwork::addCrossEntropy(bool verbose, std::string name)
 {
-	mLayers.emplace_back(new CrossEntropy(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name)));
+	mLayers.emplace_back(new CrossEntropy(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name), mVerbosity));
 }
 
 float* NeuralNetwork::getInputDataPtr()
@@ -90,30 +90,24 @@ void NeuralNetwork::setLabel(std::span<uint8_t> labels)
 
 void NeuralNetwork::train()
 {
-	//for (auto&& layer : mLayers)
-	//{
-	//	layer->propagateForward();
-	//	
-	//	if (mVerbosity == VERBOSITY::MAX)
-	//	{
-	//		layer->printOutput();
-	//	}
-	//}
-
 	inference();
 
-	if (mVerbosity == VERBOSITY::INFO)
+	if (mVerbosity >= VERBOSITY::MAX)
 	{
 		static_cast<CrossEntropy*>(mLayers.back())->printOutput();
 		printLoss();
 	}
 
-	mLearningRate = static_cast<float>(0.01 * pow((1.0 + 0.0001 * mIter++), (-0.75)));
+	if (mHyperparameters.updateType == Hyperparameters::UpdateType::SGD)
+	{
+		// TODO: magic numbers -> hyperparameters
+		mLearningRate = static_cast<float>(0.01 * pow((1.0 + 0.0001 * mIter++), (-0.75)));
+	}
 
 	for (auto it = mLayers.rbegin(); it != mLayers.rend(); ++it)
 	{
 		(*it)->propagateBackward();
-		if (mVerbosity == VERBOSITY::MAX)
+		if (mVerbosity >= VERBOSITY::MAX)
 		{
 			(*it)->printGrad();
 		}
@@ -126,7 +120,7 @@ void NeuralNetwork::inference()
 	{
 		layer->propagateForward();
 
-		if (mVerbosity == VERBOSITY::MAX)
+		if (mVerbosity >= VERBOSITY::MAX)
 		{
 			layer->printOutput();
 		}
@@ -141,4 +135,9 @@ void NeuralNetwork::printLoss()
 void NeuralNetwork::printOutput()
 {
 	static_cast<CrossEntropy*>(mLayers.back())->printOutput(); // don't need to cast really
+}
+
+float NeuralNetwork::getLoss()
+{
+	return static_cast<CrossEntropy*>(mLayers.back())->getLoss();
 }

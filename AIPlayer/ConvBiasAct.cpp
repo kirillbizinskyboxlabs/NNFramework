@@ -16,8 +16,9 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
     bool training,
     bool needDataGrad,
     bool verbose,
-    std::string name)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name))
+    std::string name,
+    VERBOSITY verbosity)
+    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
     , mLearningRate(learningRate)
     , mNeedDataGrad(needDataGrad)
 {
@@ -46,21 +47,26 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
         yTensorDim[dim + 2] = Utils::getFwdConvOutputDim(inputDim[dim + 2], padA[dim], wTensorDim[dim + 2], convstrideA[dim], dilationA[dim]);
     }
 
-    if (verbose)
+    int64_t Ysize = yTensorDim[0] * yTensorDim[1] * yTensorDim[2] * yTensorDim[3];
+
+    constexpr float biasStartValue = 0.0001f;
+
+    mWeightsSurface = std::make_unique<Surface<float>>(wTensorDim[0] * wTensorDim[1] * wTensorDim[2] * wTensorDim[3]);
+    mBiasSurface = std::make_unique<Surface<float>>(bTensorDim[0] * bTensorDim[1] * bTensorDim[2] * bTensorDim[3], biasStartValue);
+    mOutputSurface = std::make_unique<Surface<float>>(Ysize, 0.0f);
+
+    if (mVerbosityLevel >= VERBOSITY::INFO)
+    {
+        std::cout << std::format("Creating Convolution Layer {} with {} parameters", mName, mWeightsSurface->n_elems + mBiasSurface->n_elems) << std::endl;
+    }
+
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO)
     {
         std::cout << std::format("====DIMENSIONS====") << std::endl;
         std::cout << std::format("input dims are {}, {}, {}, {}", inputDim[0], inputDim[1], inputDim[2], inputDim[3]) << std::endl;
         std::cout << std::format("filter dims are {}, {}, {}, {}", wTensorDim[0], wTensorDim[1], wTensorDim[2], wTensorDim[3]) << std::endl;
         std::cout << std::format("output dims are {}, {}, {}, {}", yTensorDim[0], yTensorDim[1], yTensorDim[2], yTensorDim[3]) << std::endl;
     }
-
-    int64_t Ysize = yTensorDim[0] * yTensorDim[1] * yTensorDim[2] * yTensorDim[3];
-
-    constexpr float biasStartValue = 0.1f;
-
-    mWeightsSurface = std::make_unique<Surface<float>>(wTensorDim[0] * wTensorDim[1] * wTensorDim[2] * wTensorDim[3]);
-    mBiasSurface = std::make_unique<Surface<float>>(bTensorDim[0] * bTensorDim[1] * bTensorDim[2] * bTensorDim[3], biasStartValue);
-    mOutputSurface = std::make_unique<Surface<float>>(Ysize, 0.0f);
 
     // Xavier filter values
     std::random_device dev;
@@ -124,7 +130,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
             .setDataType(dataType)
             .build());
 
-        if (mVerbose)
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO)
         {
             std::cout << mPreviousLayer->getOutputTensor().describe() << std::endl;
             std::cout << wTensor.describe() << std::endl;
@@ -143,21 +149,21 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
             .setPostPadding(convDim, padA)
             .setDilation(convDim, dilationA)
             .build();
-        if (mVerbose) std::cout << convDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << convDesc.describe() << std::endl;
 
         // Define the bias descriptor
         auto biasDesc = cudnn_frontend::PointWiseDescBuilder()
             .setMode(CUDNN_POINTWISE_ADD)
             .setComputeType(dataType)
             .build();
-        if (mVerbose) std::cout << biasDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << biasDesc.describe() << std::endl;
 
         // Define the activation descriptor
         auto actDesc = cudnn_frontend::PointWiseDescBuilder()
             .setMode(CUDNN_POINTWISE_RELU_FWD)//CUDNN_POINTWISE_SIGMOID_FWD
             .setComputeType(dataType)
             .build();
-        if (mVerbose) std::cout << actDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << actDesc.describe() << std::endl;
 
         // Create a convolution Node
         auto conv_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR)
@@ -168,7 +174,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
             .setAlpha(alpha)
             .setBeta(beta)
             .build();
-        if (mVerbose) std::cout << conv_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << conv_op.describe() << std::endl;
 
         // Create a Bias Node.
         auto bias_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
@@ -177,7 +183,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
             .setyDesc(afterBiasTensor)
             .setpwDesc(biasDesc)
             .build();
-        if (mVerbose) std::cout << bias_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << bias_op.describe() << std::endl;
 
         // Create an Activation Node.
         auto act_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
@@ -185,7 +191,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
             .setyDesc(*mOutputTensor)
             .setpwDesc(actDesc)
             .build();
-        if (mVerbose) std::cout << act_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << act_op.describe() << std::endl;
 
         std::vector<cudnn_frontend::Operation const*> ops;
         ops.emplace_back(&conv_op);
@@ -289,42 +295,12 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
         mDataGradWorkspaceSize = std::max(mBwdDPerf.memory, mBwdFPerf.memory);
 
-        if (mVerbose) std::cout << std::format("{} backpropagation descriptor setup completed. Workspace size: {}", mName, mDataGradWorkspaceSize) << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << std::format("{} backpropagation descriptor setup completed. Workspace size: {}", mName, mDataGradWorkspaceSize) << std::endl;
 
         if (mDataGradWorkspaceSize > 0)
         {
             Utils::checkCudaError(cudaMalloc(&mDataGradWorkspacePtr, mDataGradWorkspaceSize));
         }
-
-        //Utils::checkCudnnError(cudnnGetConvolutionBackwardFilterWorkspaceSize(
-        //    mHandle, 
-        //    src->tensor, 
-        //    tensor, 
-        //    mConvDesc,
-        //    mFilterDesc,
-        //    bwF_algo, 
-        //    &workspace_bytes));
-
-        //nn->m_workspaceSize = std::max(nn->m_workspaceSize, workspace_bytes);
-
-        //Utils::checkCudnnError(cudnnGetConvolutionBackwardDataAlgorithm_v7(
-        //    mHandle, 
-        //    filterDesc, 
-        //    tensor, 
-        //    desc, 
-        //    src->tensor,
-        //    bwdDPref,
-        //    /*memoryLimitInBytes=*/memory_limit,
-        //    &bwD_algo));
-
-        //Utils::checkCudnnError(cudnnGetConvolutionBackwardDataWorkspaceSize(
-        //    mHandle, 
-        //    mFilterDesc,
-        //    tensor, 
-        //    mConvDesc,
-        //    src->tensor,
-        //    bwdDPerf.algo,
-        //    &workspace_bytes));
 
         _setupBackPropagation(needDataGrad);
     }
@@ -334,7 +310,7 @@ void ConvBiasAct::propagateBackward()
 {
     Utils::checkCudnnError(cudnnBackendExecute(mHandle, mActivationGradPlan->get_raw_desc(), mActivationGradVariantPack->get_raw_desc()));
 
-    if (mVerbose)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << std::format("Propagating backwards on {}, learning rate: {}", mName, mLearningRate) << std::endl;
 
@@ -371,7 +347,7 @@ void ConvBiasAct::propagateBackward()
         mFilterDesc,
         mWeightsGradSurface->devPtr));
 
-    if (mVerbose)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         _printBiasGrad();
         _printFilterGrad();
@@ -467,7 +443,7 @@ void ConvBiasAct::propagateBackward()
             mBiasSurface->devPtr, 1); // w = v + w
     }
 
-    if (mVerbose)
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         _printBias();
         _printFilter();
@@ -510,7 +486,7 @@ void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
             .setMode(CUDNN_POINTWISE_RELU_BWD)
             .setComputeType(CUDNN_DATA_FLOAT)
             .build();
-        if (mVerbose) std::cout << actDesc.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::DEBUG) std::cout << actDesc.describe() << std::endl;
 
         auto act_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
             .setdyDesc(gradTensor)
@@ -518,7 +494,7 @@ void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
             .setdxDesc(after_activation_tensor)
             .setpwDesc(actDesc)
             .build();
-        if (mVerbose) std::cout << act_op.describe() << std::endl;
+        if (mVerbosityLevel >= VERBOSITY::DEBUG) std::cout << act_op.describe() << std::endl;
         std::vector<cudnn_frontend::Operation const*> ops;
         ops.emplace_back(&act_op);
 
@@ -542,65 +518,6 @@ void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
 
 void ConvBiasAct::_setupBiasBackPropagation()
 {
-    ////std::cout << "Creating reduce tensor" << std::endl;
-    ////cudnnReduceTensorDescriptor_t reduceTensorDesc;
-    //Utils::checkCudnnError(cudnnCreateReduceTensorDescriptor(&mReduceTensorDesc));
-
-    ////std::cout << "Setting reduce tensor" << std::endl;
-    //Utils::checkCudnnError(cudnnSetReduceTensorDescriptor(
-    //    /*cudnnReduceTensorDescriptor_t   */mReduceTensorDesc,
-    //    /*cudnnReduceTensorOp_t           */CUDNN_REDUCE_TENSOR_ADD,
-    //    /*cudnnDataType_t                 */CUDNN_DATA_FLOAT,
-    //    /*cudnnNanPropagation_t           */CUDNN_NOT_PROPAGATE_NAN,
-    //    /*cudnnReduceTensorIndices_t      */CUDNN_REDUCE_TENSOR_NO_INDICES,
-    //    /*cudnnIndicesType_t              */CUDNN_64BIT_INDICES));
-
-    ////std::cout << "Creating grad tensors" << std::endl;
-    //cudnnTensorDescriptor_t mGradTensorDesc, mBiasGradTensorDesc;
-    //Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mGradTensorDesc));
-    //Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mBiasGradTensorDesc));
-
-    //// TODO: Proper defaults
-    //constexpr int nbDims = 3;
-
-    ////auto& inputTensor = prevLayer.getOutputTensor();
-
-    ////assert(nbDims == inputTensor.getDimCount());
-
-    //auto gradDim = mOutputTensor->getDim();
-    //auto outputStride = mOutputTensor->getStride();
-    //int mGradDims[] = { static_cast<int>(gradDim[0]), static_cast<int>(gradDim[1]), static_cast<int>(gradDim[2]), static_cast<int>(gradDim[3]) };
-    ////int gradStride[] = { mGradDims[1] * mGradDims[2] * mGradDims[3] , mGradDims[2] * mGradDims[3], mGradDims[3], 1 };
-    //int gradStride[] = { outputStride[1], outputStride[2], outputStride[3], outputStride[4] };
-
-    //int mBiasGradDims[] = { 1, mGradDims[1], mGradDims[2] }; // reduced over batch
-    ////int mBiasGradStride[] = { gradDim[1] * gradDim[2] , gradDim[2], 1 };
-
-    ////cudnnReduc
-
-    ////std::cout << "Setting grad tensors" << std::endl;
-    //Utils::checkCudnnError(cudnnSetTensorNdDescriptor(mGradTensorDesc,
-    //    dataType,
-    //    nbDims,
-    //    mGradDims,
-    //    gradStride));
-    //Utils::checkCudnnError(cudnnSetTensorNdDescriptor(mBiasGradTensorDesc,
-    //    dataType,
-    //    nbDims,
-    //    mBiasGradDims,
-    //    gradStride));
-
-    ////std::cout << "Getting workspace size" << std::endl;
-    //// Get workspace size for reduce operation
-    //size_t mBiasGradWorkspaceSize;
-    //Utils::checkCudnnError(cudnnGetReductionWorkspaceSize(mHandle, mReduceTensorDesc, mGradTensorDesc, mBiasGradTensorDesc, &mBiasGradWorkspaceSize));
-    ////std::cout << std::format("Reduction op will need {} size workspace", mBiasGradWorkspaceSize) << std::endl;
-
-    //// Allocate memory for workspace
-    //void* mBiasGradWorkspacePtr;
-    //cudaMalloc(&mBiasGradWorkspacePtr, mBiasGradWorkspaceSize);
-
-
 }
 
 void ConvBiasAct::_setupWeightBackPropagation()
