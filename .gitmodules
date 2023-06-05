@@ -4,3 +4,6 @@
 [submodule "games/Battleships"]
 	path = games/Battleships
 	url = git@github.com:Riottomsk/Battleships.git
+[submodule "games/Snake"]
+	path = games/Snake
+	url = git@github.com:Riottomsk/Snake.git
