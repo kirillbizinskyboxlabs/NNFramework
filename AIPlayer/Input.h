@@ -21,6 +21,6 @@ public:
 	void printOutput() override;
 
 private:
-	const int64_t mNbDims;
+	//const int64_t mNbDims;
 };
 

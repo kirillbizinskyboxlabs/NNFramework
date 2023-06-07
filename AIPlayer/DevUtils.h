@@ -1,11 +1,8 @@
 #pragma once
 
-//enum cudnnStatus_t;
-//enum cudaError_t;
 #include <cublas.h>
 #include <cudnn.h>
 #include <cudnn_frontend.h>
-//#include <cudnn_frontend_ExecutionPlan.h>
 
 enum class VERBOSITY
 {
@@ -36,7 +33,16 @@ namespace Utils
     void checkCudaError(cudaError_t status);
     void checkCudnnError(cudnnStatus_t status);
 
-    cudnn_frontend::Tensor flattenTensor(cudnn_frontend::Tensor& tensor, int64_t id);
+    cudnn_frontend::Tensor createTensor(
+        int64_t nbDims,
+        const int64_t* dims, // send vector instead?
+        int64_t id,
+        bool isVirtual = false,
+        cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC,
+        cudnnDataType_t dataType = CUDNN_DATA_FLOAT,
+        int64_t alignment = 16);
+
+    cudnn_frontend::Tensor flattenTensor(const cudnn_frontend::Tensor& tensor, int64_t id);
 }
 
 struct Hyperparameters
@@ -50,10 +56,21 @@ struct Hyperparameters
 
     UpdateType updateType = UpdateType::SGD;
 
-    cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-    cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
+    //cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
+    //cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
+    //int64_t alignment = 16;
 
-    int64_t nbDims = 4;
+    //int64_t nbDims = 4; // questionable
+
+    // name duplication. Not good
+    float alpha = 1.0f;
+    float beta = 0.0f;
+
+    float biasStartValue = 0.0001f;
+
+    // defaults
+    const int64_t dilationA[2] = { 1, 1 };
+    const int64_t convstrideA[2] = { 1, 1 }; // fun: array bound cannot be deduced from a default member initializer
 
     struct
     {

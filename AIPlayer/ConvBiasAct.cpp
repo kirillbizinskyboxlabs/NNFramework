@@ -23,8 +23,8 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 {
     // Defaults. TODO: Move to the appropriate place. Some of these are hyperparameters. Some are necessary constants. Bad place.
     constexpr int64_t alignment = 16; //16B to make Tensor cores work
-    cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-    cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
+    const cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
+    const cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
     constexpr int convDim = 2;
     constexpr float alpha = 1.0f;
     constexpr float beta = 0.0f;
@@ -83,58 +83,72 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
     try
     {
-        int64_t stride[nbDims];
-        Utils::generateStrides(wTensorDim, stride, nbDims, tensorFormat);
-        auto wTensor = cudnn_frontend::TensorBuilder()
-            .setDim(nbDims, wTensorDim)
-            .setStride(nbDims, stride)
-            .setId(generateTensorId())
-            .setAlignment(alignment)
-            .setDataType(dataType)
-            .build();
+        //int64_t stride[nbDims];
+        //Utils::generateStrides(wTensorDim, stride, nbDims, tensorFormat);
+        //auto wTensor = cudnn_frontend::TensorBuilder()
+        //    .setDim(nbDims, wTensorDim)
+        //    .setStride(nbDims, stride)
+        //    .setId(generateTensorId())
+        //    .setAlignment(alignment)
+        //    .setDataType(dataType)
+        //    .build();
 
-        Utils::generateStrides(bTensorDim, stride, nbDims, tensorFormat);
-        auto bTensor = cudnn_frontend::TensorBuilder()
-            .setDim(nbDims, bTensorDim)
-            .setStride(nbDims, stride)
-            .setId(generateTensorId())
-            .setAlignment(alignment)
-            .setDataType(dataType)
-            .build();
+        auto filterTensor = Utils::createTensor(nbDims, wTensorDim, generateTensorId());
 
-        Utils::generateStrides(yTensorDim, stride, nbDims, tensorFormat);
-        auto afterConvTensor = cudnn_frontend::TensorBuilder()
-            .setDim(nbDims, yTensorDim)
-            .setStride(nbDims, stride)
-            .setId(generateTensorId())  // after conv
-            .setAlignment(alignment)
-            .setVirtual()
-            .setDataType(dataType)
-            .build();
+        //Utils::generateStrides(bTensorDim, stride, nbDims, tensorFormat);
+        //auto bTensor = cudnn_frontend::TensorBuilder()
+        //    .setDim(nbDims, bTensorDim)
+        //    .setStride(nbDims, stride)
+        //    .setId(generateTensorId())
+        //    .setAlignment(alignment)
+        //    .setDataType(dataType)
+        //    .build();
 
-        auto afterBiasTensor = cudnn_frontend::TensorBuilder()
-            .setDim(nbDims, yTensorDim)
-            .setStride(nbDims, stride)
-            .setId(generateTensorId())  // after bias
-            .setAlignment(alignment)
-            .setVirtual()
-            .setDataType(dataType)
-            .build();
+        auto biasTensor = Utils::createTensor(nbDims, bTensorDim, generateTensorId());
 
-        mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
-            .setDim(nbDims, yTensorDim)
-            .setStride(nbDims, stride)
-            .setId(generateTensorId())  // after relu
-            .setAlignment(alignment)
-            .setDataType(dataType)
-            .build());
+        //Utils::generateStrides(yTensorDim, stride, nbDims, tensorFormat);
+        //auto afterConvTensor = cudnn_frontend::TensorBuilder()
+        //    .setDim(nbDims, yTensorDim)
+        //    .setStride(nbDims, stride)
+        //    .setId(generateTensorId())  // after conv
+        //    .setAlignment(alignment)
+        //    .setVirtual()
+        //    .setDataType(dataType)
+        //    .build();
+
+        auto afterConvTensor = Utils::createTensor(nbDims, wTensorDim, generateTensorId(), true);
+
+        //auto afterBiasTensor = cudnn_frontend::TensorBuilder()
+        //    .setDim(nbDims, yTensorDim)
+        //    .setStride(nbDims, stride)
+        //    .setId(generateTensorId())  // after bias
+        //    .setAlignment(alignment)
+        //    .setVirtual()
+        //    .setDataType(dataType)
+        //    .build();
+
+        auto afterBiasTensor = Utils::createTensor(nbDims, yTensorDim, generateTensorId(), true);
+
+        //mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
+        //    .setDim(nbDims, yTensorDim)
+        //    .setStride(nbDims, stride)
+        //    .setId(generateTensorId())  // after relu
+        //    .setAlignment(alignment)
+        //    .setDataType(dataType)
+        //    .build());
+
+        // after activation
+        mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(Utils::createTensor(nbDims, yTensorDim, generateTensorId()));
 
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO)
         {
             std::cout << mPreviousLayer->getOutputTensor().describe() << std::endl;
-            std::cout << wTensor.describe() << std::endl;
-            std::cout << bTensor.describe() << std::endl;
+            //std::cout << wTensor.describe() << std::endl;
+            std::cout << filterTensor.describe() << std::endl;
+            //std::cout << bTensor.describe() << std::endl;
+            std::cout << biasTensor.describe() << std::endl;
             std::cout << afterConvTensor.describe() << std::endl;
+            std::cout << afterBiasTensor.describe() << std::endl;
             std::cout << mOutputTensor->describe() << std::endl;
         }
 
@@ -159,7 +173,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
         // Define the activation descriptor
         auto actDesc = cudnn_frontend::PointWiseDescBuilder()
-            .setMode(CUDNN_POINTWISE_RELU_FWD)//CUDNN_POINTWISE_SIGMOID_FWD
+            .setMode(CUDNN_POINTWISE_RELU_FWD)// TODO: hardcoded -> parametrized. Can be CUDNN_POINTWISE_SIGMOID_FWD even though ReLU is proven to be superior
             .setComputeType(dataType)
             .build();
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << actDesc.describe() << std::endl;
@@ -167,7 +181,8 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
         // Create a convolution Node
         auto conv_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR)
             .setxDesc(mPreviousLayer->getOutputTensor())
-            .setwDesc(wTensor)
+            //.setwDesc(wTensor)
+            .setwDesc(filterTensor)
             .setyDesc(afterConvTensor) 
             .setcDesc(convDesc)
             .setAlpha(alpha)
@@ -178,7 +193,8 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
         // Create a Bias Node.
         auto bias_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
             .setxDesc(conv_op.getOutputTensor())
-            .setbDesc(bTensor)
+            //.setbDesc(bTensor)
+            .setbDesc(biasTensor)
             .setyDesc(afterBiasTensor)
             .setpwDesc(biasDesc)
             .build();
@@ -205,8 +221,10 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
         std::vector<int64_t> uids;
         uids.emplace_back(mPreviousLayer->getOutputTensor().getId());
-        uids.emplace_back(wTensor.getId());
-        uids.emplace_back(bTensor.getId());
+        //uids.emplace_back(wTensor.getId());
+        uids.emplace_back(filterTensor.getId());
+        //uids.emplace_back(bTensor.getId());
+        uids.emplace_back(biasTensor.getId());
         uids.emplace_back(mOutputTensor->getId());
 
         _setPlan(ops, data_ptrs, uids, mForwardPropagationPlan, mForwardPropagationVariantPack, mForwardPropagationWorkspaceSize, mForwardPropagationWorkspacePtr);
@@ -305,6 +323,27 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
     }
 }
 
+ConvBiasAct::~ConvBiasAct()
+{
+    Utils::checkCudnnError(cudnnDestroyTensorDescriptor(mInputTensorDesc));
+    Utils::checkCudnnError(cudnnDestroyTensorDescriptor(mGradTensorDesc));
+    Utils::checkCudnnError(cudnnDestroyTensorDescriptor(mBiasGradTensorDesc));
+    Utils::checkCudnnError(cudnnDestroyFilterDescriptor(mFilterDesc));
+    Utils::checkCudnnError(cudnnDestroyConvolutionDescriptor(mConvDesc));
+
+    if (mBiasGradWorkspacePtr)
+    {
+        Utils::checkCudaError(cudaFree(mBiasGradWorkspacePtr));
+        mForwardPropagationWorkspacePtr = nullptr;
+    }
+
+    if (mActivationGradWorkspacePtr)
+    {
+        Utils::checkCudaError(cudaFree(mActivationGradWorkspacePtr));
+        mForwardPropagationWorkspacePtr = nullptr;
+    }
+}
+
 void ConvBiasAct::propagateBackward()
 {
     Utils::checkCudnnError(cudnnBackendExecute(mHandle, mActivationGradPlan->get_raw_desc(), mActivationGradVariantPack->get_raw_desc()));
@@ -371,75 +410,72 @@ void ConvBiasAct::propagateBackward()
     }
 
     // Update weights
+    //switch (mHyperparameters.updateType)
     if (mHyperparameters.updateType == Hyperparameters::UpdateType::SGD) // SGD
     {
-        float alpha = -mLearningRate; // TODO: change name
-        cublasSaxpy(
-            //nn->cublasHandle, 
-            mWeightsSurface->n_elems,
-            alpha, 
-            mWeightsGradSurface->devPtr, 1,
-            mWeightsSurface->devPtr, 1);
-        cublasSaxpy(
-            //nn->cublasHandle, 
-            //static_cast<int>(bias_value.size()),
-            mBiasSurface->n_elems,
-            alpha, 
-            mBiasGradSurface->devPtr, 1,
-            mBiasSurface->devPtr, 1);
+        _SGDUpdate();
+        //float alpha = -mLearningRate; // TODO: change name
+        //cublasSaxpy(
+        //    mWeightsSurface->n_elems,
+        //    alpha, 
+        //    mWeightsGradSurface->devPtr, 1,
+        //    mWeightsSurface->devPtr, 1);
+        //cublasSaxpy(
+        //    mBiasSurface->n_elems,
+        //    alpha, 
+        //    mBiasGradSurface->devPtr, 1,
+        //    mBiasSurface->devPtr, 1);
     }
     else if (mHyperparameters.updateType == Hyperparameters::UpdateType::mSGD)
     {
-        //std::cout << out_channels << " backprop mSGD\n";
-        //show_some_data(filter_data, 10);
-        cublasSscal(
-            mWeightsSurface->n_elems,
-            mHyperparameters.msgd.momentum, 
-            mSGD.mGradFilterVelocitySurface->devPtr, 
-            1); // v = momentum * v
-        alpha = -mHyperparameters.msgd.L2 * mHyperparameters.msgd.lr; // alpha = -L2*epsilon
-        cublasSaxpy(
-            mWeightsSurface->n_elems,
-            alpha, 
-            mWeightsSurface->devPtr, 1,
-            mSGD.mGradFilterVelocitySurface->devPtr, 1); // v = -L2*epsilon*w + v
-        alpha = -mHyperparameters.msgd.lr; // alpha = -epsilon
-        cublasSaxpy(
-            mWeightsSurface->n_elems,
-            alpha, 
-            mWeightsGradSurface->devPtr, 1,
-            mSGD.mGradFilterVelocitySurface->devPtr, 1); // v = -epsilon*grad + v
-        alpha = 1;
-        cublasSaxpy(
-            mWeightsSurface->n_elems,
-            alpha, 
-            mSGD.mGradFilterVelocitySurface->devPtr, 1,
-            mWeightsSurface->devPtr, 1); // w = v + w
-        //show_some_data(filter_data, 10);
+        _miniBatchSGDUpdate();
+        //cublasSscal(
+        //    mWeightsSurface->n_elems,
+        //    mHyperparameters.msgd.momentum, 
+        //    mSGD.mGradFilterVelocitySurface->devPtr, 
+        //    1); // v = momentum * v
+        //alpha = -mHyperparameters.msgd.L2 * mHyperparameters.msgd.lr; // alpha = -L2*epsilon
+        //cublasSaxpy(
+        //    mWeightsSurface->n_elems,
+        //    alpha, 
+        //    mWeightsSurface->devPtr, 1,
+        //    mSGD.mGradFilterVelocitySurface->devPtr, 1); // v = -L2*epsilon*w + v
+        //alpha = -mHyperparameters.msgd.lr; // alpha = -epsilon
+        //cublasSaxpy(
+        //    mWeightsSurface->n_elems,
+        //    alpha, 
+        //    mWeightsGradSurface->devPtr, 1,
+        //    mSGD.mGradFilterVelocitySurface->devPtr, 1); // v = -epsilon*grad + v
+        //alpha = 1;
+        //cublasSaxpy(
+        //    mWeightsSurface->n_elems,
+        //    alpha, 
+        //    mSGD.mGradFilterVelocitySurface->devPtr, 1,
+        //    mWeightsSurface->devPtr, 1); // w = v + w
 
-        // bias
-        cublasSscal(
-            mBiasSurface->n_elems,
-            mHyperparameters.msgd.momentum, 
-            mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = momentum * v
-        alpha = -mHyperparameters.msgd.L2 * mHyperparameters.msgd.lr; // alpha = -L2*epsilon
-        cublasSaxpy(
-            mBiasSurface->n_elems,
-            alpha, 
-            mBiasSurface->devPtr, 1,
-            mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = -L2*epsilon*w + v
-        alpha = -mHyperparameters.msgd.lr; // alpha = -epsilon
-        cublasSaxpy(
-            mBiasSurface->n_elems,
-            alpha, 
-            mBiasGradSurface->devPtr, 1,
-            mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = -epsilon*grad + v
-        alpha = 1;
-        cublasSaxpy(
-            mBiasSurface->n_elems,
-            alpha, 
-            mSGD.mGradBiasVelocitySurface->devPtr, 1,
-            mBiasSurface->devPtr, 1); // w = v + w
+        //// bias
+        //cublasSscal(
+        //    mBiasSurface->n_elems,
+        //    mHyperparameters.msgd.momentum, 
+        //    mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = momentum * v
+        //alpha = -mHyperparameters.msgd.L2 * mHyperparameters.msgd.lr; // alpha = -L2*epsilon
+        //cublasSaxpy(
+        //    mBiasSurface->n_elems,
+        //    alpha, 
+        //    mBiasSurface->devPtr, 1,
+        //    mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = -L2*epsilon*w + v
+        //alpha = -mHyperparameters.msgd.lr; // alpha = -epsilon
+        //cublasSaxpy(
+        //    mBiasSurface->n_elems,
+        //    alpha, 
+        //    mBiasGradSurface->devPtr, 1,
+        //    mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = -epsilon*grad + v
+        //alpha = 1;
+        //cublasSaxpy(
+        //    mBiasSurface->n_elems,
+        //    alpha, 
+        //    mSGD.mGradBiasVelocitySurface->devPtr, 1,
+        //    mBiasSurface->devPtr, 1); // w = v + w
     }
 
     if (mVerbosityLevel >= VERBOSITY::DEBUG)
@@ -603,6 +639,81 @@ void ConvBiasAct::_setupDataBackPropagation()
 {
 }
 
+void ConvBiasAct::_SGDUpdate()
+{
+    float alpha = -mLearningRate; // TODO: change name
+    cublasSaxpy(
+        mWeightsSurface->n_elems,
+        alpha,
+        mWeightsGradSurface->devPtr, 1,
+        mWeightsSurface->devPtr, 1);
+    cublasSaxpy(
+        mBiasSurface->n_elems,
+        alpha,
+        mBiasGradSurface->devPtr, 1,
+        mBiasSurface->devPtr, 1);
+}
+
+void ConvBiasAct::_miniBatchSGDUpdate()
+{
+    float alpha = 0;
+
+    cublasSscal(
+        mWeightsSurface->n_elems,
+        mHyperparameters.msgd.momentum,
+        mSGD.mGradFilterVelocitySurface->devPtr,
+        1); // v = momentum * v
+
+    alpha = -mHyperparameters.msgd.L2 * mHyperparameters.msgd.lr; // alpha = -L2*epsilon
+    cublasSaxpy(
+        mWeightsSurface->n_elems,
+        alpha,
+        mWeightsSurface->devPtr, 1,
+        mSGD.mGradFilterVelocitySurface->devPtr, 1); // v = -L2*epsilon*w + v
+
+    alpha = -mHyperparameters.msgd.lr; // alpha = -epsilon
+    cublasSaxpy(
+        mWeightsSurface->n_elems,
+        alpha,
+        mWeightsGradSurface->devPtr, 1,
+        mSGD.mGradFilterVelocitySurface->devPtr, 1); // v = -epsilon*grad + v
+    alpha = 1;
+    cublasSaxpy(
+        mWeightsSurface->n_elems,
+        alpha,
+        mSGD.mGradFilterVelocitySurface->devPtr, 1,
+        mWeightsSurface->devPtr, 1); // w = v + w
+
+    // bias
+    cublasSscal(
+        mBiasSurface->n_elems,
+        mHyperparameters.msgd.momentum,
+        mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = momentum * v
+
+    alpha = -mHyperparameters.msgd.L2 * mHyperparameters.msgd.lr; // alpha = -L2*epsilon
+    cublasSaxpy(
+        mBiasSurface->n_elems,
+        alpha,
+        mBiasSurface->devPtr, 1,
+        mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = -L2*epsilon*w + v
+
+    alpha = -mHyperparameters.msgd.lr; // alpha = -epsilon
+    cublasSaxpy(
+        mBiasSurface->n_elems,
+        alpha,
+        mBiasGradSurface->devPtr, 1,
+        mSGD.mGradBiasVelocitySurface->devPtr, 1); // v = -epsilon*grad + v
+
+    alpha = 1;
+    cublasSaxpy(
+        mBiasSurface->n_elems,
+        alpha,
+        mSGD.mGradBiasVelocitySurface->devPtr, 1,
+        mBiasSurface->devPtr, 1); // w = v + w
+}
+
+
+// TODO: move to Surface
 void ConvBiasAct::_printBias()
 {
     std::cout << std::format("{} bias:", mName) << std::endl;

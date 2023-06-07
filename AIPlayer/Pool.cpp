@@ -47,30 +47,31 @@ Pool::Pool(cudnnHandle_t& handle,
     try
     {
         // TODO: Defaults, place
-        constexpr int64_t alignment = 16;
-        cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
+        //constexpr int64_t alignment = 16;
+        //cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
         cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
         float alpha = 1.0f;
         float beta = 0.0f;
 
         constexpr int64_t nbDims = 4;
 
-        int64_t stride[nbDims];
+        //int64_t stride[nbDims];
 
         auto const nanOpt = CUDNN_PROPAGATE_NAN; //CUDNN_NOT_PROPAGATE_NAN
         constexpr int64_t nbSpatialDims = 2;
         cudnn_frontend::cudnnResampleMode_t const mode = cudnn_frontend::cudnnResampleMode_t::CUDNN_RESAMPLE_AVGPOOL_INCLUDE_PADDING;
         cudnn_frontend::cudnnPaddingMode_t const padding_mode = cudnn_frontend::cudnnPaddingMode_t::CUDNN_ZERO_PAD;
 
-        Utils::generateStrides(poolTensorDim, stride, nbDims, tensorFormat);
+        //Utils::generateStrides(poolTensorDim, stride, nbDims, tensorFormat);
+        //mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
+        //    .setDim(nbDims, poolTensorDim)
+        //    .setStride(nbDims, stride)
+        //    .setId(generateTensorId())
+        //    .setAlignment(alignment)
+        //    .setDataType(dataType)
+        //    .build());
 
-        mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
-            .setDim(nbDims, poolTensorDim)
-            .setStride(nbDims, stride)
-            .setId(generateTensorId())
-            .setAlignment(alignment)
-            .setDataType(dataType)
-            .build());
+        mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(Utils::createTensor(nbDims, poolTensorDim, generateTensorId()));
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << mOutputTensor->describe() << std::endl;
 
         // Define the resample descriptor

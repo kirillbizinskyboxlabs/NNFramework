@@ -162,7 +162,8 @@ void CrossEntropy::syncLabel()
 void CrossEntropy::_initLoss()
 {
     //TODO: rename
-    auto inputTensor = _flattenTensor(mPreviousLayer->getOutputTensor());
+    //auto inputTensor = _flattenTensor(mPreviousLayer->getOutputTensor());
+    auto inputTensor = Utils::flattenTensor(mPreviousLayer->getOutputTensor(), generateTensorId());
     auto inputDim = inputTensor.getDim();
     mBatchSize = inputDim[0];
     assert(inputDim[1] == 1); //sanity check // TODO: multidimensional cross-entropy?
@@ -303,7 +304,8 @@ void CrossEntropy::_initLoss()
 void CrossEntropy::_initGrad()
 {
     // TODO: rename
-    auto inputTensor = _flattenTensor(mPreviousLayer->getOutputTensor());
+    //auto inputTensor = _flattenTensor(mPreviousLayer->getOutputTensor());
+     auto inputTensor = Utils::flattenTensor(mPreviousLayer->getOutputTensor(), generateTensorId());
     // TODO: Proper defaults
     constexpr int64_t alignment = 16;
     const cudnnDataType_t dataType = CUDNN_DATA_FLOAT;

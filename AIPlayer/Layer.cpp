@@ -52,6 +52,12 @@ Layer::~Layer()
         checkCudaError(cudaFree(mForwardPropagationWorkspacePtr));
         mForwardPropagationWorkspacePtr = nullptr;
     }
+
+    if (mDataGradWorkspacePtr)
+    {
+        checkCudaError(cudaFree(mDataGradWorkspacePtr));
+        mDataGradWorkspacePtr = nullptr;
+    }
 }
 
 void Layer::propagateForward()
@@ -70,7 +76,7 @@ void Layer::propagateForward()
 
 }
 
-cudnn_frontend::Tensor& Layer::getOutputTensor() const
+const cudnn_frontend::Tensor& Layer::getOutputTensor() const
 {
     assert(mOutputTensor); // Assert it's initialized
     return *mOutputTensor;
@@ -194,12 +200,12 @@ void Layer::printGrad()
 }
 
 void Layer::_setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
-    std::vector<void*> data_ptrs,
-    std::vector<int64_t> uids,
-    std::unique_ptr<cudnn_frontend::ExecutionPlan>& plan,
-    std::unique_ptr<cudnn_frontend::VariantPack>& variantPack,
-    int64_t& workspace_size,
-    void*& workspace_ptr)
+                     std::vector<void*>& data_ptrs,
+                     std::vector<int64_t>& uids,
+                     std::unique_ptr<cudnn_frontend::ExecutionPlan>& plan,
+                     std::unique_ptr<cudnn_frontend::VariantPack>& variantPack,
+                     int64_t& workspace_size,
+                     void*& workspace_ptr)
 {
     if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "_setPlan" << std::endl;
 
@@ -232,7 +238,7 @@ void Layer::_setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
     if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "variantPack " << variantPack->describe() << std::endl;
 }
 
-void Layer::_setForwardPropagationPlan(std::vector<cudnn_frontend::Operation const*>& ops, std::vector<void*> data_ptrs, std::vector<int64_t> uids)
+void Layer::_setForwardPropagationPlan(std::vector<cudnn_frontend::Operation const*>& ops, std::vector<void*>& data_ptrs, std::vector<int64_t>& uids)
 {
     _setPlan(ops, data_ptrs, uids, mForwardPropagationPlan, mForwardPropagationVariantPack, mForwardPropagationWorkspaceSize, mForwardPropagationWorkspacePtr);
 }

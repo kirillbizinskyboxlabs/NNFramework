@@ -76,36 +76,34 @@ public:
     virtual void propagateForward();
     virtual void propagateBackward() = 0;
 
-    cudnn_frontend::Tensor& getOutputTensor() const; // Is this OK when const return non const reference that is known to be changed elsewhere?
-    Surface<float>& getOutputSurface() const; //TODO: same question
-    Surface<float>& getGradSurface() const; // maybe make it a struct even?
+    const cudnn_frontend::Tensor& getOutputTensor() const;
+    Surface<float>& getOutputSurface() const; // does this function makes sense to be const? Surface is expected to change
+    Surface<float>& getGradSurface() const;
 
     virtual void printOutput();
     virtual void printGrad();
 
-    // temporary public??
+    virtual void saveParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) {} // do nothing by default
+    virtual void loadParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) {} // do nothing by default
+
+protected:
     static int64_t generateTensorId()
     {
         static int64_t id = 0;
         return id++;
     }
 
-
-    virtual void saveParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) {} // do nothing by default
-    virtual void loadParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) {} // do nothing by default
-
-protected:
 	void _setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
-		std::vector<void*> data_ptrs,
-		std::vector<int64_t> uids,
-		std::unique_ptr<cudnn_frontend::ExecutionPlan>& plan,
-		std::unique_ptr<cudnn_frontend::VariantPack>& variant,
-		int64_t& workspace_size,
-		void*& workspace_ptr);
+		          std::vector<void*>& data_ptrs,
+		          std::vector<int64_t>& uids,
+		          std::unique_ptr<cudnn_frontend::ExecutionPlan>& plan,
+		          std::unique_ptr<cudnn_frontend::VariantPack>& variant,
+		          int64_t& workspace_size,
+		          void*& workspace_ptr);
 
     void _setForwardPropagationPlan(std::vector<cudnn_frontend::Operation const*>& ops,
-        std::vector<void*> data_ptrs,
-        std::vector<int64_t> uids);
+                                    std::vector<void*>& data_ptrs,
+                                    std::vector<int64_t>& uids);
 
 	cudnnHandle_t& mHandle;
     VERBOSITY mVerbosityLevel;

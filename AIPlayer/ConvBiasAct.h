@@ -17,7 +17,7 @@ public:
 		VERBOSITY verbosity = VERBOSITY::MIN);
 	ConvBiasAct(const ConvBiasAct&) = delete;
 	ConvBiasAct& operator=(const ConvBiasAct&) = delete;
-	~ConvBiasAct() = default;
+	~ConvBiasAct();
 
 	void propagateBackward() override;
 
@@ -30,6 +30,9 @@ private:
 	void _setupWeightBackPropagation();
 	void _setupDataBackPropagation();
 
+	void _SGDUpdate();
+	void _miniBatchSGDUpdate();
+
 	void _printBias();
 	void _printFilter();
 	void _printActivationGrad();
@@ -39,7 +42,6 @@ private:
 	std::unique_ptr<Surface<float>> mWeightsSurface;
 	std::unique_ptr<Surface<float>> mBiasSurface;
 
-	//cudnnReduceTensorDescriptor_t mReduceTensorDesc;
 	cudnnTensorDescriptor_t mInputTensorDesc; // TODO: acquire from previous Layer
 	cudnnTensorDescriptor_t mGradTensorDesc; // TODO: move to Layer
 	cudnnTensorDescriptor_t mBiasGradTensorDesc;
@@ -50,9 +52,6 @@ private:
 
 	size_t mBiasGradWorkspaceSize;
 	void* mBiasGradWorkspacePtr;
-
-	//size_t mGradWorkspaceSize;
-	//void* mGradWorkspacePtr;
 
 	//float mLearningRate = 0.001;
 	const float& mLearningRate;
@@ -70,8 +69,6 @@ private:
 
 	struct // mSGD parameters
 	{
-		//float* d_v_f = nullptr;
-		//float* d_v_b = nullptr;
 		std::unique_ptr<Surface<float>> mGradBiasVelocitySurface;
 		std::unique_ptr<Surface<float>> mGradFilterVelocitySurface;
 	} mSGD;
