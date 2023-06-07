@@ -13,7 +13,6 @@ public:
 	Layer(cudnnHandle_t& handle, 
         Layer* previousLayer,
         const Hyperparameters& hyperparameters,
-        bool verbose = false, 
         std::string name = "",
         VERBOSITY verbosityLevel = VERBOSITY::ERROR);
 	virtual ~Layer();
@@ -109,7 +108,6 @@ protected:
         std::vector<int64_t> uids);
 
 	cudnnHandle_t& mHandle;
-	bool mVerbose;
     VERBOSITY mVerbosityLevel;
 
 	std::unique_ptr<Surface<float>> mOutputSurface;

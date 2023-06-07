@@ -1,8 +1,8 @@
-export module DQN;
+module;
 
 #include "NeuralNetwork.h"
 
-import "ExperienceReplay";
+export module DQN;
 
 export void DQNSnake()
 {

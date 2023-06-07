@@ -11,7 +11,6 @@ public:
 		int64_t dims[],
 		const Hyperparameters& hyperparameters,
 		VERBOSITY verbosity = VERBOSITY::MIN,
-		bool verbose = false,
 		std::string name = "Input");
 
 	float* getHostPtr(); // loading up data is a responsibility of the user

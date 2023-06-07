@@ -9,7 +9,9 @@
 
 enum class VERBOSITY
 {
-    MIN = 0,
+    NONE = 0,
+
+    MIN,
     ERROR,
     INFO,
     REACH_INFO,

@@ -15,10 +15,9 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
     const int64_t convPad,
     bool training,
     bool needDataGrad,
-    bool verbose,
     std::string name,
     VERBOSITY verbosity)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
+    : Layer(handle, previousLayer, hyperparameters, std::move(name), verbosity)
     , mLearningRate(learningRate)
     , mNeedDataGrad(needDataGrad)
 {

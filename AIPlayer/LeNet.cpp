@@ -50,15 +50,15 @@ namespace LeNet
         NeuralNetwork nn(batchSize, dims.size(), dims.data(), verbosity, "LeNet");
         nn.mHyperparameters.updateType = Hyperparameters::UpdateType::mSGD;
 
-        nn.addConvBiasAct(C1KernelSize, C1Features, C1Padding, verbose, "C1");
-        nn.addPool(verbose, "S2");
-        nn.addConvBiasAct(C3KernelSize, C3Features, C3Padding, verbose, "C3");
-        nn.addPool(verbose, "S4");
-        nn.addConvBiasAct(C5KernelSize, C5Features, C5Padding, verbose, "FC5");
-        //nn.addConvBiasAct(1, FC6OutputSize, 0, verbose, "FC6");
-        nn.addConvBiasAct(FC7KernelSize, FC7OutputSize, FC7Padding, verbose, "FC7");
-        nn.addSoftmax(verbose);
-        nn.addCrossEntropy(verbose);
+        nn.addConvBiasAct(C1KernelSize, C1Features, C1Padding, "C1");
+        nn.addPool("S2");
+        nn.addConvBiasAct(C3KernelSize, C3Features, C3Padding, "C3");
+        nn.addPool("S4");
+        nn.addConvBiasAct(C5KernelSize, C5Features, C5Padding, "FC5");
+        //nn.addConvBiasAct(1, FC6OutputSize, 0, "FC6");
+        nn.addConvBiasAct(FC7KernelSize, FC7OutputSize, FC7Padding, "FC7");
+        nn.addSoftmax();
+        nn.addCrossEntropy();
 
 
         float minLoss = FLT_MAX;

@@ -9,10 +9,9 @@ import <iostream>;
 Softmax::Softmax(cudnnHandle_t& handle, 
     Layer* previousLayer, 
     const Hyperparameters& hyperparameters,
-    bool verbose, 
     std::string name,
     VERBOSITY verbosity)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
+    : Layer(handle, previousLayer, hyperparameters, std::move(name), verbosity)
 {
     if (mVerbosityLevel >= VERBOSITY::INFO)
     {
@@ -177,7 +176,7 @@ void Softmax::propagateBackward()
             srcTensorDesc, // that makes sense, right? it describes the data pointer in the other layer
             mPreviousLayer->getGradSurface().devPtr); // next level in backprop chain needs the gradient
 
-        if (mVerbose)
+        if (mVerbosityLevel >= VERBOSITY::DEBUG)
         {
             std::cout << cudnnGetErrorString(status) << std::endl;
         }

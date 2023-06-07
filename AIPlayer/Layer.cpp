@@ -34,9 +34,8 @@ void display_flat(float* image, size_t size)
     std::cout << "\n";
 }
 
-Layer::Layer(cudnnHandle_t& handle, Layer* previousLayer, const Hyperparameters& hyperparameters, bool verbose, std::string name, VERBOSITY verbosityLevel)
+Layer::Layer(cudnnHandle_t& handle, Layer* previousLayer, const Hyperparameters& hyperparameters, std::string name, VERBOSITY verbosityLevel)
     : mHandle(handle)
-    , mVerbose(verbose)
     , mForwardPropagationWorkspaceSize(0)
     , mForwardPropagationWorkspacePtr(nullptr)
     , mPreviousLayer(previousLayer)
@@ -91,7 +90,7 @@ Layer::Surface<float>& Layer::getGradSurface() const
 
 void Layer::printOutput()
 {
-    if (!mVerbose)
+    if (mVerbosityLevel < VERBOSITY::DEBUG)
     {
         return;
     }
@@ -150,7 +149,7 @@ void Layer::printOutput()
 
 void Layer::printGrad()
 {
-    if (!mVerbose)
+    if (mVerbosityLevel < VERBOSITY::DEBUG)
     {
         return;
     }

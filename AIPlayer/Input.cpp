@@ -7,9 +7,8 @@ Input::Input(cudnnHandle_t& handle,
 	int64_t dims[], 
 	const Hyperparameters& hyperparameters, 
 	VERBOSITY verbosity,
-	bool verbose, 
 	std::string name)
-	: Layer(handle, nullptr, hyperparameters, verbose, std::move(name), verbosity)
+	: Layer(handle, nullptr, hyperparameters, std::move(name), verbosity)
 	, mNbDims(nbDims)
 {
 	constexpr int64_t alignment = 16;
@@ -55,7 +54,7 @@ void Input::propagateForward()
 
 void Input::printOutput()
 {
-	if (!mVerbose)
+	if (mVerbosityLevel < VERBOSITY::DEBUG)
 	{
 		return;
 	}

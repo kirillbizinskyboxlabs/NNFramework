@@ -7,7 +7,6 @@ public:
 	Pool(cudnnHandle_t& handle,
 		Layer* previousLayer,
 		const Hyperparameters& hyperparameters,
-		bool verbose = false,
 		std::string name = "Pool",
 		VERBOSITY verbosity = VERBOSITY::MIN);
 

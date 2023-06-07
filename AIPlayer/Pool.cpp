@@ -7,10 +7,9 @@ import <iostream>;
 Pool::Pool(cudnnHandle_t& handle, 
     Layer* previousLayer, 
     const Hyperparameters& hyperparameters,
-    bool verbose,
     std::string name,
     VERBOSITY verbosity)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
+    : Layer(handle, previousLayer, hyperparameters, std::move(name), verbosity)
 {
     int64_t poolTensorDim[] = { 0, 0, 0, 0 };
     auto& inputTensor = mPreviousLayer->getOutputTensor();

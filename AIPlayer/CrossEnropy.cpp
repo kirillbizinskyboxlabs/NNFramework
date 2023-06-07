@@ -6,10 +6,9 @@ import <format>;
 CrossEntropy::CrossEntropy(cudnnHandle_t& handle, 
     Layer* previousLayer, 
     const Hyperparameters& hyperparameters,
-    bool verbose, 
     std::string name,
     VERBOSITY verbosity)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
+    : Layer(handle, previousLayer, hyperparameters, std::move(name), verbosity)
     , mGradWorkspaceSize(0)
     , mGradWorkspacePtr(nullptr)
 {
@@ -119,7 +118,7 @@ void CrossEntropy::calculateGrad()
         throw;
     }
 
-    if (mVerbose) 
+    if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << "calculateGrad" << std::endl;
     }

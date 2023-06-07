@@ -13,7 +13,6 @@ public:
 		const int64_t convPad = 2,
 		bool training = true,
 		bool needDataGrad = true,
-		bool verbose = false,
 		std::string name = "ConvBiasAct",
 		VERBOSITY verbosity = VERBOSITY::MIN);
 	ConvBiasAct(const ConvBiasAct&) = delete;

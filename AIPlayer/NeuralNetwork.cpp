@@ -45,26 +45,30 @@ NeuralNetwork::~NeuralNetwork()
 	}
 }
 
-void NeuralNetwork::addConvBiasAct(const int64_t kernelSize, const int64_t filterSize, const int64_t convPad, bool verbose, std::string name)
+void NeuralNetwork::addConvBiasAct(const int64_t kernelSize, const int64_t filterSize, const int64_t convPad, std::string name, VERBOSITY verbosityOverride)
 {
+	verbosityOverride = verbosityOverride != VERBOSITY::NONE ? verbosityOverride : mVerbosity;
 	bool needDataGrad = mLayers.size() > 1;
 	bool mTraining = true; // TODO: move to member var
-	mLayers.emplace_back(new ConvBiasAct(mHandle, kernelSize, filterSize, mLayers.back(), mHyperparameters, mLearningRate, convPad, mTraining, needDataGrad, verbose, std::move(name), mVerbosity));
+	mLayers.emplace_back(new ConvBiasAct(mHandle, kernelSize, filterSize, mLayers.back(), mHyperparameters, mLearningRate, convPad, mTraining, needDataGrad, std::move(name), verbosityOverride));
 }
 
-void NeuralNetwork::addPool(bool verbose, std::string name)
+void NeuralNetwork::addPool(std::string name, VERBOSITY verbosityOverride)
 {
-	mLayers.emplace_back(new Pool(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name), mVerbosity));
+	verbosityOverride = verbosityOverride != VERBOSITY::NONE ? verbosityOverride : mVerbosity;
+	mLayers.emplace_back(new Pool(mHandle, mLayers.back(), mHyperparameters, std::move(name), verbosityOverride));
 }
 
-void NeuralNetwork::addSoftmax(bool verbose, std::string name)
+void NeuralNetwork::addSoftmax(std::string name, VERBOSITY verbosityOverride)
 {
-	mLayers.emplace_back(new Softmax(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name), mVerbosity));
+	verbosityOverride = verbosityOverride != VERBOSITY::NONE ? verbosityOverride : mVerbosity;
+	mLayers.emplace_back(new Softmax(mHandle, mLayers.back(), mHyperparameters, std::move(name), verbosityOverride));
 }
 
-void NeuralNetwork::addCrossEntropy(bool verbose, std::string name)
+void NeuralNetwork::addCrossEntropy(std::string name, VERBOSITY verbosityOverride)
 {
-	mLayers.emplace_back(new CrossEntropy(mHandle, mLayers.back(), mHyperparameters, verbose, std::move(name), mVerbosity));
+	verbosityOverride = verbosityOverride != VERBOSITY::NONE ? verbosityOverride : mVerbosity;
+	mLayers.emplace_back(new CrossEntropy(mHandle, mLayers.back(), mHyperparameters, std::move(name), verbosityOverride));
 }
 
 float* NeuralNetwork::getInputDataPtr()
@@ -87,6 +91,7 @@ void NeuralNetwork::syncLabel()
 	return static_cast<CrossEntropy*>(mLayers.back())->syncLabel();
 }
 
+// deprecated
 void NeuralNetwork::setLabel(std::span<uint8_t> labels)
 {
 	static_cast<CrossEntropy*>(mLayers.back())->setLabel(labels);

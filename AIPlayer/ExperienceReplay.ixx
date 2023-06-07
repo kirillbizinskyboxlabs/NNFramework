@@ -5,6 +5,7 @@ import <random>;
 import <cassert>;
 import <cstring>;
 import <filesystem>;
+import <fstream>;
 
 using namespace std;
 
@@ -24,6 +25,11 @@ public:
 	virtual ~State() = default;
 
 	const std::vector<float>& getData() const
+	{
+		return mData;
+	}
+
+	std::vector<float>& getData()
 	{
 		return mData;
 	}
@@ -82,7 +88,7 @@ void ExperienceReplay::loadExperience(float* dataPtr, size_t batchSize) const
 
 void ExperienceReplay::saveToDisk(std::filesystem::path experiencePath) const
 {
-	if (mExperiences.empty())
+	if (mExperience.empty())
 	{
 		return;
 	}
@@ -94,7 +100,9 @@ void ExperienceReplay::saveToDisk(std::filesystem::path experiencePath) const
 
 	std::ofstream experienceFile(experiencePath, std::ios::binary);
 
-	experienceFile.write(reinterpret_cast<char*>(&mExperience.size()), sizeof(size_t)); // write number of experiences
+	size_t size = mExperience.size();
+
+	experienceFile.write(reinterpret_cast<char*>(&size), sizeof(size_t)); // write number of experiences
 
 	size_t stateSize = mExperience[0].getData().size();
 
@@ -102,7 +110,7 @@ void ExperienceReplay::saveToDisk(std::filesystem::path experiencePath) const
 
 	for (auto&& exp : mExperience)
 	{
-		experienceFile.write(reinterpret_cast<char*>(exp.getData().data()), sizeof(float) * stateSize); // TODO: proper data type retrieval
+		experienceFile.write(reinterpret_cast<const char*>(exp.getData().data()), sizeof(float) * stateSize); // TODO: proper data type retrieval
 	}
 }
 
@@ -127,7 +135,7 @@ void ExperienceReplay::loadFromDisk(std::filesystem::path experiencePath)
 
 	for (auto&& exp : mExperience)
 	{
-		experienceFile.write(reinterpret_cast<char*>(exp.getData().data()), sizeof(float)); // TODO: proper data type retrieval
+		experienceFile.read(reinterpret_cast<char*>(exp.getData().data()), sizeof(float) * stateSize); // TODO: proper data type retrieval
 	}
 }
 

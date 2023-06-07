@@ -54,6 +54,9 @@
     <ClCompile Include="ExperienceReplay.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DQN.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Layer.h">

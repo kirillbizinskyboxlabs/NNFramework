@@ -9,7 +9,6 @@ public:
 	CrossEntropy(cudnnHandle_t& handle, 
 		Layer* previousLayer, 
 		const Hyperparameters& hyperparameters, 
-		bool verbose = false, 
 		std::string name = "CrossEntropy",
 		VERBOSITY verbosity = VERBOSITY::MIN);
 	~CrossEntropy();
