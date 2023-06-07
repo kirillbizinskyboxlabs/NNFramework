@@ -5,17 +5,7 @@
 import <vector>;
 import <memory>;
 import <string>;
-
-//enum class VERBOSITY
-//{
-//    MIN = 0,
-//    ERROR,
-//    INFO,
-//    WARNING,
-//    DEBUG,
-//
-//    MAX
-//};
+import <filesystem>;
 
 class Layer
 {
@@ -100,6 +90,10 @@ public:
         static int64_t id = 0;
         return id++;
     }
+
+
+    virtual void saveParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) {} // do nothing by default
+    virtual void loadParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) {} // do nothing by default
 
 protected:
 	void _setPlan(std::vector<cudnn_frontend::Operation const*>& ops,

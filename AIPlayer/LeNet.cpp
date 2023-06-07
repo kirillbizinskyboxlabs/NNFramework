@@ -12,9 +12,9 @@ import MNISTData;
 
 namespace LeNet
 {
-    void LenetForward()
+    void Lenet(bool train, bool verbose)
     {
-        std::cout << "LeNet Test v1.2" << std::endl;
+        std::cout << "LeNet Test v1.3" << std::endl;
 
         // Hyperparameters?
         constexpr int64_t batchSize = 128;
@@ -34,18 +34,20 @@ namespace LeNet
         constexpr int64_t FC7Padding = 0;
         constexpr int64_t FC7OutputSize = 10;
 
-        bool verbose = false;
+        //bool verbose = false;
+
+        VERBOSITY verbosity = verbose ? VERBOSITY::INFO : VERBOSITY::MIN;
 
         MNISTDataHolder dh;
         dh.initialize();
-        dh.presentData();
+        //dh.presentData();
         //auto [image, label] = dh.getNextTrain();
         //auto [images, labels] = dh.getNextNTrain(batchSize);
         auto [rows, cols] = dh.getDimensions();
 
         std::vector<size_t> dims = { 1, rows, cols };
 
-        NeuralNetwork nn(batchSize, dims.size(), dims.data(), VERBOSITY::REACH_INFO);
+        NeuralNetwork nn(batchSize, dims.size(), dims.data(), verbosity, "LeNet");
         nn.mHyperparameters.updateType = Hyperparameters::UpdateType::mSGD;
 
         nn.addConvBiasAct(C1KernelSize, C1Features, C1Padding, verbose, "C1");
@@ -59,18 +61,8 @@ namespace LeNet
         nn.addCrossEntropy(verbose);
 
 
-        constexpr size_t epoch_num = 50;
-        const size_t epoch_iter = dh.getTrainSize() / batchSize;
-        const size_t total_iter = epoch_num * epoch_iter;
-        constexpr size_t showPerEpoch = 1;
-        size_t frequency = epoch_iter / showPerEpoch;
-        constexpr size_t output_frequency = 5;
-        size_t iter = 0;
-        //size_t frequency = 100;
-        //iter_num = 2;
-
         float minLoss = FLT_MAX;
-        size_t minLossIter = iter;
+        size_t minLossIter = 0;
         size_t validationSize = dh.getValidationSize();
 
         auto validate = [&nn, &dh, validationSize, &minLoss, &minLossIter, batchSize](size_t iter)
@@ -98,28 +90,49 @@ namespace LeNet
             }
         };
 
-        while (iter < total_iter)
+        if (train)
         {
-            dh.loadTrainData<float>(batchSize, nn.getInputDataPtr(), nn.getLabelDataPtr());
-            nn.syncLabel();
+            constexpr size_t epoch_num = 50;
+            const size_t epoch_iter = dh.getTrainSize() / batchSize;
+            const size_t total_iter = epoch_num * epoch_iter;
+            constexpr size_t showPerEpoch = 1;
+            size_t frequency = epoch_iter / showPerEpoch;
+            constexpr size_t output_frequency = 5;
+            size_t iter = 0;
+            //size_t frequency = 100;
+            //iter_num = 2;
 
-            nn.train();
 
-            if (iter % epoch_iter == 0)
+            while (iter < total_iter)
             {
-                std::cout << std::format("Iter {} ", iter);
-                nn.printLoss();
-                
-                if(iter % (epoch_iter* output_frequency) == 0)
+                dh.loadTrainData<float>(batchSize, nn.getInputDataPtr(), nn.getLabelDataPtr());
+                nn.syncLabel();
+
+                nn.train();
+
+                if (iter % epoch_iter == 0)
                 {
-                    nn.printOutput();
+                    std::cout << std::format("Iter {} ", iter);
+                    nn.printLoss();
+
+                    if (iter % (epoch_iter * output_frequency) == 0)
+                    {
+                        nn.printOutput();
+                    }
+
+                    validate(iter);
+
                 }
 
-                validate(iter);
-
+                iter++;
             }
 
-            iter++;
+            nn.saveParameters(); // TODO: make conditional?
+        }
+        else
+        {
+            nn.loadParameters();
+            validate(0);
         }
 
         std::cout << std::format("Lowest loss over validation {} on {} iter", minLoss, minLossIter) << std::endl;

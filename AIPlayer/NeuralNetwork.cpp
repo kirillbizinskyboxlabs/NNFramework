@@ -6,14 +6,18 @@
 #include "Pool.h"
 #include "Softmax.h"
 
+constexpr char SAVE_DIR_ROOT[] = "saved_weights";
+
 NeuralNetwork::NeuralNetwork(size_t batchSize, 
 							 size_t nbDims, 
 							 size_t inputDims[], 
-							 VERBOSITY verbosity)
+							 VERBOSITY verbosity,
+							 std::string name)
 	: mBatchSize(batchSize)
 	, mVerbosity(verbosity)
 	, mNbDims(nbDims + 1) // + batch 
 	, mInputDims(mNbDims)
+	, mName(std::move(name))
 {
 	mInputDims[0] = mBatchSize;
 
@@ -140,4 +144,44 @@ void NeuralNetwork::printOutput()
 float NeuralNetwork::getLoss()
 {
 	return static_cast<CrossEntropy*>(mLayers.back())->getLoss();
+}
+
+void NeuralNetwork::saveParameters()
+{
+	std::filesystem::path root_dir = std::filesystem::current_path() / SAVE_DIR_ROOT / mName.c_str();
+
+	try
+	{
+		std::filesystem::create_directories(root_dir);
+	}
+	catch (const std::exception& e)
+	{
+		std::cout << e.what() << std::endl;
+	}
+	
+
+	if (mVerbosity >= VERBOSITY::INFO) std::cout << std::format("Saving NN parameters to {}", root_dir.string()) << std::endl;
+
+	for (auto&& layer : mLayers)
+	{
+		layer->saveParameters(root_dir, mName);
+	}
+}
+
+void NeuralNetwork::loadParameters()
+{
+	std::filesystem::path root_dir = std::filesystem::current_path() / SAVE_DIR_ROOT / mName.c_str();
+
+	if (!std::filesystem::exists(root_dir) || root_dir.empty())
+	{
+		std::cout << std::format("No parameters to load from {}", root_dir.string()) << std::endl;
+		return;
+	}
+
+	if (mVerbosity >= VERBOSITY::INFO) std::cout << std::format("Loading {} parameters from {}", mName, root_dir.string()) << std::endl;
+
+	for (auto&& layer : mLayers)
+	{
+		layer->loadParameters(root_dir, mName);
+	}
 }

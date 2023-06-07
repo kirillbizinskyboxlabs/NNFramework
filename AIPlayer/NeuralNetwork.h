@@ -9,36 +9,14 @@ import <ranges>;
 
 class Layer;
 
-//enum class VERBOSITY
-//{
-//	MIN = 0,
-//	ERROR,
-//	INFO,
-//	WARNING,
-//	DEBUG,
-//
-//	MAX
-//};
-
-
 class NeuralNetwork
 {
 public:
-	//enum class VERBOSITY
-	//{
-	//	MIN = 0,
-	//	ERROR,
-	//	INFO,
-	//	WARNING,
-	//	DEBUG,
-
-	//	MAX
-	//};
-
 	NeuralNetwork(size_t batchSize, 
 				  size_t nbDims, 
 				  size_t inputDims[], 
-				  VERBOSITY verbosity = VERBOSITY::MIN);
+				  VERBOSITY verbosity = VERBOSITY::MIN,
+				  std::string name = "");
 	~NeuralNetwork();
 
 	void addConvBiasAct(const int64_t kernelSize,
@@ -69,6 +47,9 @@ public:
 	// temporary public
 	Hyperparameters mHyperparameters;
 
+	void saveParameters();
+	void loadParameters();
+
 private:
 	cudnnHandle_t mHandle;
 
@@ -81,5 +62,7 @@ private:
 
 	float mLearningRate;
 	size_t mIter = 0;
+
+	std::string mName;
 };
 

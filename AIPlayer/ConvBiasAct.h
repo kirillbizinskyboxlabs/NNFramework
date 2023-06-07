@@ -21,6 +21,10 @@ public:
 	~ConvBiasAct() = default;
 
 	void propagateBackward() override;
+
+	void saveParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) override;
+	void loadParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) override;
+
 private:
 	void _setupBackPropagation(bool needDataGrad);
 	void _setupBiasBackPropagation();

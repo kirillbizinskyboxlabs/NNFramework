@@ -149,6 +149,7 @@
     <ClCompile Include="ConvBiasAct.cpp" />
     <ClCompile Include="CrossEnropy.cpp" />
     <ClCompile Include="DevUtils.cpp" />
+    <ClCompile Include="ExperienceReplay.ixx" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="Layer.cpp" />
     <ClCompile Include="LeNet.cpp" />

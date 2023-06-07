@@ -450,6 +450,82 @@ void ConvBiasAct::propagateBackward()
     }
 }
 
+void ConvBiasAct::saveParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName)
+{
+    mWeightsSurface->devToHostSync();
+    mBiasSurface->devToHostSync();
+
+    // TODO: save triaining stuff like grad and momentum too???
+
+    auto weightsFilePath = dir / (std::string(NeuralNetworkName) + '_' + mName + std::to_string(mWeightsSurface->n_elems));
+    auto biasFilePath = dir / (std::string(NeuralNetworkName) + '_' + mName + std::to_string(mBiasSurface->n_elems));
+
+    if (mVerbosityLevel >= VERBOSITY::INFO) std::cout << std::format("Saving ConvBiasAct filter parameters to ", weightsFilePath.string()) << std::endl;
+
+    std::ofstream filterFile(weightsFilePath, std::ios::binary);
+    int64_t filterSize = mWeightsSurface->n_elems;
+    int64_t filterElementSize = sizeof(mWeightsSurface->hostPtr[0]); // can be done better?
+
+    filterFile.write(reinterpret_cast<char*>(&filterSize), sizeof(int64_t));
+    filterFile.write(reinterpret_cast<char*>(&filterElementSize), sizeof(int64_t));
+    
+    filterFile.write(reinterpret_cast<char*>(mWeightsSurface->hostPtr), filterSize * filterElementSize);
+
+    if (mVerbosityLevel >= VERBOSITY::INFO) std::cout << std::format("Saving Bias parameters to {}", biasFilePath.string()) << std::endl;
+
+    std::ofstream biasFile(biasFilePath, std::ios::binary);
+    int64_t biasSize = mBiasSurface->n_elems;
+    int64_t biasElementSize = sizeof(mBiasSurface->hostPtr[0]); // can be done better? // should be equal to filter elements???
+
+    biasFile.write(reinterpret_cast<char*>(&biasSize), sizeof(int64_t));
+    biasFile.write(reinterpret_cast<char*>(&biasElementSize), sizeof(int64_t));
+
+    biasFile.write(reinterpret_cast<char*>(mBiasSurface->hostPtr), biasSize * biasElementSize);
+}
+
+void ConvBiasAct::loadParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName)
+{
+    // TODO: load triaining stuff like grad and momentum too???
+
+    auto filterFilePath = dir / (std::string(NeuralNetworkName) + '_' + mName + std::to_string(mWeightsSurface->n_elems));
+    auto biasFilePath = dir / (std::string(NeuralNetworkName) + '_' + mName + std::to_string(mBiasSurface->n_elems));
+
+    if (!std::filesystem::exists(filterFilePath) || !std::filesystem::exists(biasFilePath))
+    {
+        std::cout << std::format("No parameters to load. Expected file names are: {}, {}", filterFilePath.string(), biasFilePath.string()) << std::endl;
+        return;
+    }
+
+    if (mVerbosityLevel >= VERBOSITY::INFO) std::cout << std::format("Loading filter parameters from {}", filterFilePath.string()) << std::endl;
+
+    std::ifstream filterFile(filterFilePath, std::ios::binary);
+    int64_t filterSize;
+    int64_t filterElementSize;
+
+    filterFile.read(reinterpret_cast<char*>(&filterSize), sizeof(int64_t)); // first parameter expected to be the number of elements
+    filterFile.read(reinterpret_cast<char*>(&filterElementSize), sizeof(int64_t));
+    assert(filterSize == mWeightsSurface->n_elems);
+    assert(filterElementSize == sizeof(mWeightsSurface->hostPtr[0]));
+
+    filterFile.read(reinterpret_cast<char*>(mWeightsSurface->hostPtr), filterSize * filterElementSize);
+
+    if (mVerbosityLevel >= VERBOSITY::INFO) std::cout << std::format("Loading bias parameters from {}", biasFilePath.string()) << std::endl;
+
+    std::ifstream biasFile(biasFilePath, std::ios::binary);
+    int64_t biasSize;
+    int64_t biasElementSize;
+
+    biasFile.read(reinterpret_cast<char*>(&biasSize), sizeof(int64_t));
+    biasFile.read(reinterpret_cast<char*>(&biasElementSize), sizeof(int64_t));
+    assert(biasSize = mBiasSurface->n_elems);
+    assert(biasElementSize = sizeof(mBiasSurface->hostPtr[0]));
+
+    biasFile.read(reinterpret_cast<char*>(mBiasSurface->hostPtr), biasSize * biasElementSize);
+
+    mWeightsSurface->hostToDevSync();
+    mBiasSurface->hostToDevSync();
+}
+
 void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
 {
     mGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);

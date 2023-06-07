@@ -6,15 +6,13 @@ import MNISTData;
 import LeNet;
 
 import <iostream>;
-//import <ranges>;
-//import <vector>;
-//import <utility>;
 
 void testDataRetrieval();
 
 int main()
 {
-    LeNet::LenetForward();
+    //LeNet::Lenet(true, false);
+    LeNet::Lenet(false, false);
 }
 
 void testDataRetrieval()
