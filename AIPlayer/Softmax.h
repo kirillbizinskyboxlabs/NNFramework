@@ -1,14 +1,12 @@
 #pragma once
 #include "Layer.h"
 
-
 class Softmax : public Layer
 {
 public:
 	Softmax(cudnnHandle_t& handle, 
 		Layer* previousLayer,
 		const Hyperparameters& hyperparameters,
-		bool verbose = false, 
 		std::string name = "Softmax",
 		VERBOSITY verbosity = VERBOSITY::MIN);
 

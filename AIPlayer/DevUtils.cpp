@@ -5,6 +5,7 @@
 import <random>;
 import <format>;
 import <iostream>;
+import <vector>;
 
 //anonymus namespace. Not too good TODO:rethink
 namespace
@@ -102,10 +103,9 @@ int64_t Utils::getFwdConvOutputDim(
     return (p);
 }
 
-void Utils::generateStrides(const int64_t* dimA, int64_t* strideA, int64_t nbDims, cudnnTensorFormat_t filterFormat) {
-    // For INT8x4 and INT8x32 we still compute standard strides here to input
-    // into the cuDNN functions. We will manually scale by resizeFactor in the cpu ref.
-    if (filterFormat == CUDNN_TENSOR_NCHW) {
+// can be constexpr?
+void Utils::generateStrides(const int64_t* dimA, int64_t* strideA, int64_t nbDims, cudnnTensorFormat_t tensorFormat) {
+    if (tensorFormat == CUDNN_TENSOR_NCHW) {
         strideA[nbDims - 1] = 1;
         for (int64_t d = nbDims - 2; d >= 0; d--) {
             strideA[d] = strideA[d + 1] * dimA[d + 1];
@@ -140,29 +140,41 @@ void Utils::checkCudnnError(cudnnStatus_t status)
     }
 }
 
+// can be made constexpr?
+cudnn_frontend::Tensor Utils::createTensor(int64_t nbDims, const int64_t* dims, int64_t id, bool isVirtual, cudnnTensorFormat_t tensorFormat, cudnnDataType_t dataType, int64_t alignment)
+{
+    std::vector<int64_t> stride(nbDims);
+    generateStrides(dims, stride.data(), nbDims, tensorFormat); // can be constexpr?
+
+    return cudnn_frontend::TensorBuilder()
+        .setAlignment(alignment)
+        .setDataType(dataType)
+        .setId(id)
+        .setDim(nbDims, dims)
+        .setStride(nbDims, stride.data())
+        .setVirtual(isVirtual)
+        .build();
+}
+
 namespace Utils
 {
-    cudnn_frontend::Tensor flattenTensor(cudnn_frontend::Tensor& tensor, int64_t id)
+    cudnn_frontend::Tensor flattenTensor(const cudnn_frontend::Tensor& tensor, int64_t id)
     {
-        // TODO: magic numbers remove I shall
-        if (tensor.getDimCount() > 3)
+        constexpr int64_t nbDims = 3; // this operation converts 4D tensor to 3D (that is actually 2D)
+        if (tensor.getDimCount() > nbDims)
         {
             auto tensorDim = tensor.getDim();
             int64_t flattenTensorDim[] = { tensorDim[0], 1, tensorDim[1] * tensorDim[2] * tensorDim[3] }; // can be done better
 
             // TODO: Defaults, place
-            constexpr int64_t alignment = 16; //16
+            constexpr int64_t alignment = 16;
             //constexpr cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
             constexpr cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-            constexpr float alpha = 1.0f;
-            constexpr float beta = 0.0f;
-            const int64_t FCstride[3] = { flattenTensorDim[1] * flattenTensorDim[2], flattenTensorDim[2], 1 };
-            //Helpers::generateStrides(flattenTensorDim, FCstride, 3, tensorFormat);
-            // 
+            const int64_t flattenStride[nbDims] = { flattenTensorDim[1] * flattenTensorDim[2], flattenTensorDim[2], 1 };
             // RVO
             return cudnn_frontend::TensorBuilder()
-                .setDim(3, flattenTensorDim)
-                .setStride(3, FCstride)
+                .setDim(nbDims, flattenTensorDim)
+                .setStride(nbDims, flattenStride)
                 .setId(id)
                 .setAlignment(alignment)  // 16B alignment is needed to run a tensor core engine
                 .setDataType(dataType)

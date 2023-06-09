@@ -1,19 +1,23 @@
 #include "Softmax.h"
+//module;
 
 #include "DevUtils.h"
+#include <iomanip>
+
+//module NeuralNetwork:Softmax;
 
 import <format>;
 import <iostream>;
-#include <iomanip>
+//#include <iomanip>
 
 Softmax::Softmax(cudnnHandle_t& handle, 
     Layer* previousLayer, 
     const Hyperparameters& hyperparameters,
-    bool verbose, 
     std::string name,
     VERBOSITY verbosity)
-    : Layer(handle, previousLayer, hyperparameters, verbose, std::move(name), verbosity)
+    : Layer(handle, previousLayer, hyperparameters, std::move(name), verbosity)
 {
+    // Can be moved to Layer??
     if (mVerbosityLevel >= VERBOSITY::INFO)
     {
         std::cout << std::format("Creating {} Layer", mName) << std::endl;
@@ -61,14 +65,8 @@ Softmax::Softmax(cudnnHandle_t& handle,
         mDims.data(),
         stride);
 
-    // we need to define output
-    mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
-        .setDim(nbDims, inputDim)
-        .setStride(nbDims, inputTensor.getStride())
-        .setId(generateTensorId())
-        .setAlignment(16)
-        .setDataType(CUDNN_DATA_FLOAT)
-        .build());
+    mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(Utils::createTensor(nbDims, inputDim, generateTensorId()));
+
 
     if (mVerbosityLevel == VERBOSITY::REACH_INFO)
     {
@@ -99,10 +97,6 @@ void Softmax::propagateForward()
     if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << cudnnGetErrorString(status) << std::endl;
-    }
-
-    if (mVerbosityLevel >= VERBOSITY::DEBUG)
-    {
         printOutput();
     }
 }
@@ -121,7 +115,6 @@ void Softmax::printOutput()
     mPreviousLayer->getOutputSurface().devToHostSync();
     mOutputSurface->devToHostSync();
 
-    //auto yDim = yTensor->getDim();
     for (size_t i = 0; i < mDims.size(); ++i)
     {
         std::cout << std::format("yDim[{}]: {}", i, mDims[i]) << std::endl;
@@ -156,36 +149,21 @@ void Softmax::propagateBackward()
     if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << "Softmax backprop" << std::endl;
-    }
-
-    if (mVerbosityLevel >= VERBOSITY::DEBUG)
-    {
         printGrad();
     }
 
-    try {
-        auto status = cudnnSoftmaxBackward(
-            mHandle,
-            CUDNN_SOFTMAX_ACCURATE,
-            CUDNN_SOFTMAX_MODE_INSTANCE,
-            &alpha,
-            sftTensorDesc,
-            mOutputSurface->devPtr,
-            /*dyDesc*/ sftTensorDesc, // srcTensorDesc == sftTensorDesc, probably can be used interchangeably
-            /**dy*/ mGradSurface->devPtr, // we expect valid gradient to be populated. make a sanity check?
-            &beta,
-            srcTensorDesc, // that makes sense, right? it describes the data pointer in the other layer
-            mPreviousLayer->getGradSurface().devPtr); // next level in backprop chain needs the gradient
-
-        if (mVerbose)
-        {
-            std::cout << cudnnGetErrorString(status) << std::endl;
-        }
-    }
-    catch (cudnn_frontend::cudnnException& e)
-    {
-        std::cout << std::format("Softmax backprop failed: {}", e.what()) << std::endl;
-    }
+    Utils::checkCudnnError(cudnnSoftmaxBackward(
+        mHandle,
+        CUDNN_SOFTMAX_ACCURATE,
+        CUDNN_SOFTMAX_MODE_INSTANCE,
+        &alpha,
+        sftTensorDesc,
+        mOutputSurface->devPtr,
+        /*dyDesc*/ sftTensorDesc, // srcTensorDesc == sftTensorDesc, probably can be used interchangeably
+        /**dy*/ mGradSurface->devPtr, // we expect valid gradient to be populated. make a sanity check?
+        &beta,
+        srcTensorDesc, // that makes sense, right? it describes the data pointer in the other layer
+        mPreviousLayer->getGradSurface().devPtr)); // next level in backprop chain needs the gradient
 
     if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {

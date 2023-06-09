@@ -9,7 +9,6 @@ public:
 	CrossEntropy(cudnnHandle_t& handle, 
 		Layer* previousLayer, 
 		const Hyperparameters& hyperparameters, 
-		bool verbose = false, 
 		std::string name = "CrossEntropy",
 		VERBOSITY verbosity = VERBOSITY::MIN);
 	~CrossEntropy();
@@ -20,8 +19,6 @@ public:
 
 	float getLoss();
 
-	//int executeInference() override { return 0; } // stubbed out since inference make little sense. Loss shouldn't be a Layer probably...
-	//void propagateForward() override;
 	void propagateBackward() override;
 
 	void calculateLoss();
@@ -34,7 +31,6 @@ public:
 private:
 	void _initLoss();
 	void _initGrad();
-	cudnn_frontend::Tensor _flattenTensor(cudnn_frontend::Tensor& tensor);
 
 	int64_t mBatchSize;
 	int64_t mNumClasses;

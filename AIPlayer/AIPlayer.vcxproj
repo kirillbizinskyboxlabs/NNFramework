@@ -147,16 +147,25 @@
   <ItemGroup>
     <ClCompile Include="AIPlayer.cpp" />
     <ClCompile Include="ConvBiasAct.cpp" />
+    <ClCompile Include="ConvBiasAct.ixx" />
     <ClCompile Include="CrossEnropy.cpp" />
+    <ClCompile Include="CrossEntropy.ixx" />
     <ClCompile Include="DevUtils.cpp" />
+    <ClCompile Include="DQN.ixx" />
+    <ClCompile Include="ExperienceReplay.ixx" />
     <ClCompile Include="Input.cpp" />
+    <ClCompile Include="Input.ixx" />
     <ClCompile Include="Layer.cpp" />
+    <ClCompile Include="Layer.ixx" />
     <ClCompile Include="LeNet.cpp" />
     <ClCompile Include="LeNet.ixx" />
     <ClCompile Include="MNISTData.ixx" />
     <ClCompile Include="NeuralNetwork.cpp" />
+    <ClCompile Include="NeuralNetwork.ixx" />
     <ClCompile Include="Pool.cpp" />
+    <ClCompile Include="Pool.ixx" />
     <ClCompile Include="Softmax.cpp" />
+    <ClCompile Include="Softmax.ixx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ConvBiasAct.h" />

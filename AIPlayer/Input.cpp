@@ -1,5 +1,7 @@
 #include "Input.h"
 
+//module NeuralNetwork:Input;
+
 import <format>;
 
 Input::Input(cudnnHandle_t& handle, 
@@ -7,28 +9,12 @@ Input::Input(cudnnHandle_t& handle,
 	int64_t dims[], 
 	const Hyperparameters& hyperparameters, 
 	VERBOSITY verbosity,
-	bool verbose, 
 	std::string name)
-	: Layer(handle, nullptr, hyperparameters, verbose, std::move(name), verbosity)
-	, mNbDims(nbDims)
+	: Layer(handle, nullptr, hyperparameters, std::move(name), verbosity)
 {
-	constexpr int64_t alignment = 16;
-	constexpr cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-	constexpr cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
+	mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(Utils::createTensor(nbDims, dims, generateTensorId()));
 
-	std::vector<int64_t> stride(mNbDims);
-
-	Utils::generateStrides(dims, stride.data(), mNbDims, tensorFormat);
-
-	mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
-		.setAlignment(alignment)
-		.setDataType(dataType)
-		.setDim(mNbDims, dims)
-		.setStride(mNbDims, stride.data())
-		.setId(generateTensorId())
-		.build());
-
-	int64_t size = std::accumulate(dims, dims + mNbDims, 1ll, std::multiplies<int64_t>());
+	int64_t size = std::accumulate(dims, dims + nbDims, 1ll, std::multiplies<int64_t>());
 	mOutputSurface = std::make_unique<Surface<float>>(size, 0.0f);
 
 	if (mVerbosityLevel >= VERBOSITY::REACH_INFO)
@@ -53,9 +39,9 @@ void Input::propagateForward()
 	mOutputSurface->hostToDevSync();
 }
 
-void Input::printOutput()
+void Input::printOutput() // not const because it's an override and for other layers it is usually non-const
 {
-	if (!mVerbose)
+	if (mVerbosityLevel < VERBOSITY::DEBUG)
 	{
 		return;
 	}

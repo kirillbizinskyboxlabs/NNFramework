@@ -13,19 +13,29 @@ public:
 		const int64_t convPad = 2,
 		bool training = true,
 		bool needDataGrad = true,
-		bool verbose = false,
 		std::string name = "ConvBiasAct",
-		VERBOSITY verbosity = VERBOSITY::MIN);
+		VERBOSITY verbosity = VERBOSITY::MIN,
+		const int64_t dilation = 1,
+		const int64_t convStride = 1);
 	ConvBiasAct(const ConvBiasAct&) = delete;
 	ConvBiasAct& operator=(const ConvBiasAct&) = delete;
-	~ConvBiasAct() = default;
+	~ConvBiasAct();
 
 	void propagateBackward() override;
+
+	void saveParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) override;
+	void loadParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) override;
+
 private:
-	void _setupBackPropagation(bool needDataGrad);
+	void _setupBackPropagation();
+	void _setupActivationBackPropagation();
 	void _setupBiasBackPropagation();
-	void _setupWeightBackPropagation();
+	void _setupFilterBackPropagation();
 	void _setupDataBackPropagation();
+	void _setupBackPropagationAlgorithms();
+
+	void _SGDUpdate();
+	void _miniBatchSGDUpdate();
 
 	void _printBias();
 	void _printFilter();
@@ -33,10 +43,21 @@ private:
 	void _printBiasGrad();
 	void _printFilterGrad();
 
+	const int mConvDim = 2;
+	const std::vector<int64_t> mPad;
+	const std::vector<int64_t> mDilation;
+	const std::vector<int64_t> mConvStride;
+	const cudnnTensorFormat_t mTensorFormat = CUDNN_TENSOR_NHWC;
+	const cudnnConvolutionMode_t mConvMode = CUDNN_CROSS_CORRELATION;
+	const cudnnDataType_t mDataType = CUDNN_DATA_FLOAT;
+	const float mAlpha = 1.0f;
+	const float mBeta = 0.0f;
+	const int64_t mFilterSize;
+	const int64_t mKernelSize;
+
 	std::unique_ptr<Surface<float>> mWeightsSurface;
 	std::unique_ptr<Surface<float>> mBiasSurface;
 
-	//cudnnReduceTensorDescriptor_t mReduceTensorDesc;
 	cudnnTensorDescriptor_t mInputTensorDesc; // TODO: acquire from previous Layer
 	cudnnTensorDescriptor_t mGradTensorDesc; // TODO: move to Layer
 	cudnnTensorDescriptor_t mBiasGradTensorDesc;
@@ -48,10 +69,6 @@ private:
 	size_t mBiasGradWorkspaceSize;
 	void* mBiasGradWorkspacePtr;
 
-	//size_t mGradWorkspaceSize;
-	//void* mGradWorkspacePtr;
-
-	//float mLearningRate = 0.001;
 	const float& mLearningRate;
 	bool mNeedDataGrad = true;
 
@@ -67,8 +84,6 @@ private:
 
 	struct // mSGD parameters
 	{
-		//float* d_v_f = nullptr;
-		//float* d_v_b = nullptr;
 		std::unique_ptr<Surface<float>> mGradBiasVelocitySurface;
 		std::unique_ptr<Surface<float>> mGradFilterVelocitySurface;
 	} mSGD;

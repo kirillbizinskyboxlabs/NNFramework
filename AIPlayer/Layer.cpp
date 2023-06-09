@@ -1,24 +1,18 @@
+//module;
 #include "Layer.h"
 
 #include <cublas.h>
 #include <cudnn.h>
 #include <cudnn_frontend.h>
 #include "DevUtils.h"
+#include <iomanip>
+
+//module NeuralNetwork:Layer;
 
 import <iostream>;
 import <format>;
 import <exception>;
-//import <iomanip>;
-
-#include <iomanip>
-
-//constexpr float epsilon = 0.01f; // learning rate
-//constexpr int64_t alignment = 16; //16B to make Tensor cores work
-//constexpr cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-//constexpr cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-//constexpr int convDim = 2;
-//constexpr float alpha = 1.0f;
-//constexpr float beta = 0.0f;
+//import <iomanip>; // didn't work
 
 constexpr int precision = 8;
 
@@ -34,9 +28,8 @@ void display_flat(float* image, size_t size)
     std::cout << "\n";
 }
 
-Layer::Layer(cudnnHandle_t& handle, Layer* previousLayer, const Hyperparameters& hyperparameters, bool verbose, std::string name, VERBOSITY verbosityLevel)
+Layer::Layer(cudnnHandle_t& handle, Layer* previousLayer, const Hyperparameters& hyperparameters, std::string name, VERBOSITY verbosityLevel)
     : mHandle(handle)
-    , mVerbose(verbose)
     , mForwardPropagationWorkspaceSize(0)
     , mForwardPropagationWorkspacePtr(nullptr)
     , mPreviousLayer(previousLayer)
@@ -52,6 +45,12 @@ Layer::~Layer()
     {
         checkCudaError(cudaFree(mForwardPropagationWorkspacePtr));
         mForwardPropagationWorkspacePtr = nullptr;
+    }
+
+    if (mDataGradWorkspacePtr)
+    {
+        checkCudaError(cudaFree(mDataGradWorkspacePtr));
+        mDataGradWorkspacePtr = nullptr;
     }
 }
 
@@ -71,7 +70,7 @@ void Layer::propagateForward()
 
 }
 
-cudnn_frontend::Tensor& Layer::getOutputTensor() const
+const cudnn_frontend::Tensor& Layer::getOutputTensor() const
 {
     assert(mOutputTensor); // Assert it's initialized
     return *mOutputTensor;
@@ -91,7 +90,7 @@ Layer::Surface<float>& Layer::getGradSurface() const
 
 void Layer::printOutput()
 {
-    if (!mVerbose)
+    if (mVerbosityLevel < VERBOSITY::DEBUG)
     {
         return;
     }
@@ -113,9 +112,6 @@ void Layer::printOutput()
 
     if (yDim[2] == yDim[3] && yDim[2] != 1)
     {
-        //cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-        //int64_t stride[4];
-        //generateStrides(yDim, stride, 4, tensorFormat);
         for (int64_t b = 0; b < yDim[0]; ++b)
         {
             for (int64_t c = 0; c < yDim[1]; ++c)
@@ -150,7 +146,7 @@ void Layer::printOutput()
 
 void Layer::printGrad()
 {
-    if (!mVerbose)
+    if (mVerbosityLevel < VERBOSITY::DEBUG)
     {
         return;
     }
@@ -195,12 +191,12 @@ void Layer::printGrad()
 }
 
 void Layer::_setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
-    std::vector<void*> data_ptrs,
-    std::vector<int64_t> uids,
-    std::unique_ptr<cudnn_frontend::ExecutionPlan>& plan,
-    std::unique_ptr<cudnn_frontend::VariantPack>& variantPack,
-    int64_t& workspace_size,
-    void*& workspace_ptr)
+                     std::vector<void*>& data_ptrs,
+                     std::vector<int64_t>& uids,
+                     std::unique_ptr<cudnn_frontend::ExecutionPlan>& plan,
+                     std::unique_ptr<cudnn_frontend::VariantPack>& variantPack,
+                     int64_t& workspace_size,
+                     void*& workspace_ptr)
 {
     if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "_setPlan" << std::endl;
 
@@ -233,7 +229,7 @@ void Layer::_setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
     if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "variantPack " << variantPack->describe() << std::endl;
 }
 
-void Layer::_setForwardPropagationPlan(std::vector<cudnn_frontend::Operation const*>& ops, std::vector<void*> data_ptrs, std::vector<int64_t> uids)
+void Layer::_setForwardPropagationPlan(std::vector<cudnn_frontend::Operation const*>& ops, std::vector<void*>& data_ptrs, std::vector<int64_t>& uids)
 {
     _setPlan(ops, data_ptrs, uids, mForwardPropagationPlan, mForwardPropagationVariantPack, mForwardPropagationWorkspaceSize, mForwardPropagationWorkspacePtr);
 }
