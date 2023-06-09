@@ -14,7 +14,9 @@ public:
 		bool training = true,
 		bool needDataGrad = true,
 		std::string name = "ConvBiasAct",
-		VERBOSITY verbosity = VERBOSITY::MIN);
+		VERBOSITY verbosity = VERBOSITY::MIN,
+		const int64_t dilation = 1,
+		const int64_t convStride = 1);
 	ConvBiasAct(const ConvBiasAct&) = delete;
 	ConvBiasAct& operator=(const ConvBiasAct&) = delete;
 	~ConvBiasAct();
@@ -25,10 +27,12 @@ public:
 	void loadParameters(const std::filesystem::path& dir, std::string_view NeuralNetworkName) override;
 
 private:
-	void _setupBackPropagation(bool needDataGrad);
+	void _setupBackPropagation();
+	void _setupActivationBackPropagation();
 	void _setupBiasBackPropagation();
-	void _setupWeightBackPropagation();
+	void _setupFilterBackPropagation();
 	void _setupDataBackPropagation();
+	void _setupBackPropagationAlgorithms();
 
 	void _SGDUpdate();
 	void _miniBatchSGDUpdate();
@@ -38,6 +42,24 @@ private:
 	void _printActivationGrad();
 	void _printBiasGrad();
 	void _printFilterGrad();
+
+	const int mConvDim = 2;
+	const std::vector<int64_t> mPad;
+	//const int64_t mPadHeight;
+	//const int64_t mPadWidth;
+	const std::vector<int64_t> mDilation;
+	//const int64_t mDilationHeight = 1;
+	//const int64_t mDilationWidth = 1;
+	const std::vector<int64_t> mConvStride;
+	//const int64_t mConvStrideHeight = 1;
+	//const int64_t mConvStrideWidth = 1;
+	const cudnnTensorFormat_t mTensorFormat = CUDNN_TENSOR_NHWC;
+	const cudnnConvolutionMode_t mConvMode = CUDNN_CROSS_CORRELATION;
+	const cudnnDataType_t mDataType = CUDNN_DATA_FLOAT;
+	const float mAlpha = 1.0f;
+	const float mBeta = 0.0f;
+	const int64_t mFilterSize;
+	const int64_t mKernelSize;
 
 	std::unique_ptr<Surface<float>> mWeightsSurface;
 	std::unique_ptr<Surface<float>> mBiasSurface;

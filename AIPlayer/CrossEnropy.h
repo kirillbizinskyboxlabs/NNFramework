@@ -33,7 +33,7 @@ public:
 private:
 	void _initLoss();
 	void _initGrad();
-	cudnn_frontend::Tensor _flattenTensor(cudnn_frontend::Tensor& tensor);
+	//cudnn_frontend::Tensor _flattenTensor(cudnn_frontend::Tensor& tensor);
 
 	int64_t mBatchSize;
 	int64_t mNumClasses;

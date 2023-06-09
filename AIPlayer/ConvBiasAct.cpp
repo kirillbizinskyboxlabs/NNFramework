@@ -16,18 +16,27 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
     bool training,
     bool needDataGrad,
     std::string name,
-    VERBOSITY verbosity)
+    VERBOSITY verbosity,
+    const int64_t dilation,
+    const int64_t convStride)
     : Layer(handle, previousLayer, hyperparameters, std::move(name), verbosity)
+    //, mPadHeight(convPad)
+    //, mPadWidth(convPad)
+    , mPad(mConvDim, convPad)
+    , mDilation(mConvDim, dilation)
+    , mConvStride(mConvDim, convStride)
+    , mFilterSize(filterSize)
+    , mKernelSize(kernelSize)
     , mLearningRate(learningRate)
     , mNeedDataGrad(needDataGrad)
 {
     // Defaults. TODO: Move to the appropriate place. Some of these are hyperparameters. Some are necessary constants. Bad place.
-    constexpr int64_t alignment = 16; //16B to make Tensor cores work
-    const cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-    const cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-    constexpr int convDim = 2;
-    constexpr float alpha = 1.0f;
-    constexpr float beta = 0.0f;
+    //constexpr int64_t alignment = 16; //16B to make Tensor cores work
+    //const cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
+    //const cudnnConvolutionMode_t convMode = CUDNN_CROSS_CORRELATION;
+    //constexpr int convDim = 2;
+    //constexpr float alpha = 1.0f;
+    //constexpr float beta = 0.0f;
 
     constexpr int64_t nbDims = 4;
 
@@ -35,15 +44,16 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
     const int64_t wTensorDim[] = { filterSize, inputDim[1], kernelSize, kernelSize }; // filter
     int64_t yTensorDim[] = { 0, 0, 0, 0 }; // Computed Below
-    const int64_t padA[] = { convPad, convPad };
-    const int64_t dilationA[] = { 1, 1 }; // TODO: make proper defaults
-    const int64_t convstrideA[] = { 1, 1 };
+    //const int64_t padA[] = { convPad, convPad };
+    //const int64_t dilationA[] = { 1, 1 }; // TODO: make proper defaults
+    //const int64_t convstrideA[] = { 1, 1 };
     const int64_t bTensorDim[] = { 1, wTensorDim[0], 1, 1 };  // bias
 
     yTensorDim[0] = inputDim[0];
     yTensorDim[1] = wTensorDim[0];
     for (int dim = 0; dim < 2; dim++) {
-        yTensorDim[dim + 2] = Utils::getFwdConvOutputDim(inputDim[dim + 2], padA[dim], wTensorDim[dim + 2], convstrideA[dim], dilationA[dim]);
+        //yTensorDim[dim + 2] = Utils::getFwdConvOutputDim(inputDim[dim + 2], padA[dim], wTensorDim[dim + 2], convstrideA[dim], dilationA[dim]);
+        yTensorDim[dim + 2] = Utils::getFwdConvOutputDim(inputDim[dim + 2], mPad[dim], wTensorDim[dim + 2], mConvStride[dim], mDilation[dim]);
     }
 
     int64_t Ysize = yTensorDim[0] * yTensorDim[1] * yTensorDim[2] * yTensorDim[3];
@@ -67,6 +77,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
         std::cout << std::format("output dims are {}, {}, {}, {}", yTensorDim[0], yTensorDim[1], yTensorDim[2], yTensorDim[3]) << std::endl;
     }
 
+    // TODO: move to Surface?
     // Xavier filter values
     std::random_device dev;
     std::mt19937 gen(dev());
@@ -116,7 +127,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
         //    .setDataType(dataType)
         //    .build();
 
-        auto afterConvTensor = Utils::createTensor(nbDims, wTensorDim, generateTensorId(), true);
+        auto afterConvTensor = Utils::createTensor(nbDims, yTensorDim, generateTensorId(), true);
 
         //auto afterBiasTensor = cudnn_frontend::TensorBuilder()
         //    .setDim(nbDims, yTensorDim)
@@ -154,27 +165,27 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
         // Define the convolution problem
         auto convDesc = cudnn_frontend::ConvDescBuilder()
-            .setComputeType(dataType)
-            .setMathMode(CUDNN_CROSS_CORRELATION)
-            .setSpatialDimCount(convDim)
-            .setSpatialStride(convDim, convstrideA)
-            .setPrePadding(convDim, padA)
-            .setPostPadding(convDim, padA)
-            .setDilation(convDim, dilationA)
+            .setComputeType(mDataType)
+            .setMathMode(mConvMode)
+            .setSpatialDimCount(mConvDim)
+            .setSpatialStride(mConvDim, mConvStride.data())
+            .setPrePadding(mConvDim, mPad.data())
+            .setPostPadding(mConvDim, mPad.data())
+            .setDilation(mConvDim, mDilation.data())
             .build();
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << convDesc.describe() << std::endl;
 
         // Define the bias descriptor
         auto biasDesc = cudnn_frontend::PointWiseDescBuilder()
             .setMode(CUDNN_POINTWISE_ADD)
-            .setComputeType(dataType)
+            .setComputeType(mDataType)
             .build();
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << biasDesc.describe() << std::endl;
 
         // Define the activation descriptor
         auto actDesc = cudnn_frontend::PointWiseDescBuilder()
             .setMode(CUDNN_POINTWISE_RELU_FWD)// TODO: hardcoded -> parametrized. Can be CUDNN_POINTWISE_SIGMOID_FWD even though ReLU is proven to be superior
-            .setComputeType(dataType)
+            .setComputeType(mDataType)
             .build();
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << actDesc.describe() << std::endl;
 
@@ -185,8 +196,8 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
             .setwDesc(filterTensor)
             .setyDesc(afterConvTensor) 
             .setcDesc(convDesc)
-            .setAlpha(alpha)
-            .setBeta(beta)
+            .setAlpha(mAlpha)
+            .setBeta(mBeta)
             .build();
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << conv_op.describe() << std::endl;
 
@@ -235,91 +246,79 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
     if (training)
     {
-        mGradSurface = std::make_unique<Surface<float>>(Ysize, 0.0f);
+        //mGradSurface = std::make_unique<Surface<float>>(Ysize, 0.0f);
+        //Utils::checkCudnnError(cudnnCreateFilterDescriptor(&mFilterDesc));
+        //Utils::checkCudnnError(cudnnSetFilter4dDescriptor(mFilterDesc,
+        //    /*dataType=*/mDataType,
+        //    /*format=*/mTensorFormat,
+        //    /*out_channels=*/filterSize,
+        //    /*in_channels=*/inputDim[1],
+        //    /*kernel_height=*/kernelSize,
+        //    /*kernel_width=*/kernelSize)); // most of convolution requires square kernels - change if needed
+        //Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mBiasGradTensorDesc));
+        //Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mBiasGradTensorDesc,
+        //    mTensorFormat,
+        //    mDataType,
+        //    1, filterSize,
+        //    1, 1));
+        //Utils::checkCudnnError(cudnnCreateConvolutionDescriptor(&mConvDesc));
+        //Utils::checkCudnnError(cudnnSetConvolution2dDescriptor(mConvDesc,
+        //    /*pad_height=*/convPad,
+        //    /*pad_width=*/convPad,
+        //    /*vertical_stride=*/1,
+        //    /*horizontal_stride=*/1,
+        //    /*dilation_height=*/1,
+        //    /*dilation_width=*/1,
+        //    /*mode=*/mConvMode,
+        //    /*computeType=*/mDataType));
+        ////cudnnGetConvolutionBackwardDataAlgorithm_v7
+        ////cudnnConvolutionBwdDataPreference_t bwdDPref;
+        ////cudnnConvolutionBwdFilterPreference_t bwdFPref;
+        //Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mInputTensorDesc));
+        //Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mGradTensorDesc));
+        //Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mInputTensorDesc,
+        //    /*format=*/mTensorFormat,
+        //    /*dataType=*/mDataType,
+        //    /*batch_size=*/inputDim[0],
+        //    /*channels=*/inputDim[1],
+        //    /*image_height=*/inputDim[2],
+        //    /*image_width=*/inputDim[3]));
+        //Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mGradTensorDesc,
+        //    /*format=*/mTensorFormat,
+        //    /*dataType=*/mDataType,
+        //    /*batch_size=*/inputDim[0],
+        //    /*channels=*/yTensorDim[1],
+        //    /*image_height=*/yTensorDim[2],
+        //    /*image_width=*/yTensorDim[3]));
+        //
+        //const int requestedAlgoCount = 1;
+        //int returnedAlgoCount;
+        //Utils::checkCudnnError(cudnnFindConvolutionBackwardDataAlgorithm(
+        //    /*cudnnHandle_t                          */mHandle,
+        //    /*const cudnnFilterDescriptor_t          */mFilterDesc,
+        //    /*const cudnnTensorDescriptor_t          */mGradTensorDesc,
+        //    /*const cudnnConvolutionDescriptor_t     */mConvDesc,
+        //    /*const cudnnTensorDescriptor_t          */mInputTensorDesc,
+        //    /*const int                              */requestedAlgoCount,
+        //    /*int* */&returnedAlgoCount,
+        //    /*cudnnConvolutionBwdDataAlgoPerf_t* */&mBwdDPerf));
+        //Utils::checkCudnnError(cudnnFindConvolutionBackwardFilterAlgorithm(
+        //    mHandle, 
+        //    mInputTensorDesc,
+        //    mGradTensorDesc,
+        //    mConvDesc,
+        //    mFilterDesc,
+        //    requestedAlgoCount,
+        //    &returnedAlgoCount,
+        //    &mBwdFPerf));
+        //mDataGradWorkspaceSize = std::max(mBwdDPerf.memory, mBwdFPerf.memory);
+        //if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << std::format("{} backpropagation descriptor setup completed. Workspace size: {}", mName, mDataGradWorkspaceSize) << std::endl;
+        //if (mDataGradWorkspaceSize > 0)
+        //{
+        //    Utils::checkCudaError(cudaMalloc(&mDataGradWorkspacePtr, mDataGradWorkspaceSize));
+        //}
 
-        Utils::checkCudnnError(cudnnCreateFilterDescriptor(&mFilterDesc));
-        Utils::checkCudnnError(cudnnSetFilter4dDescriptor(mFilterDesc,
-            /*dataType=*/dataType,
-            /*format=*/tensorFormat,
-            /*out_channels=*/filterSize,
-            /*in_channels=*/inputDim[1],
-            /*kernel_height=*/kernelSize,
-            /*kernel_width=*/kernelSize)); // most of convolution requires square kernels - change if needed
-
-        Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mBiasGradTensorDesc));
-        Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mBiasGradTensorDesc,
-            tensorFormat,
-            dataType,
-            1, filterSize,
-            1, 1));
-
-        Utils::checkCudnnError(cudnnCreateConvolutionDescriptor(&mConvDesc));
-        Utils::checkCudnnError(cudnnSetConvolution2dDescriptor(mConvDesc,
-            /*pad_height=*/convPad,
-            /*pad_width=*/convPad,
-            /*vertical_stride=*/1,
-            /*horizontal_stride=*/1,
-            /*dilation_height=*/1,
-            /*dilation_width=*/1,
-            /*mode=*/CUDNN_CROSS_CORRELATION,
-            /*computeType=*/dataType));
-
-        //cudnnGetConvolutionBackwardDataAlgorithm_v7
-        //cudnnConvolutionBwdDataPreference_t bwdDPref;
-        //cudnnConvolutionBwdFilterPreference_t bwdFPref;
-
-        Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mInputTensorDesc));
-        Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mGradTensorDesc));
-
-        Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mInputTensorDesc,
-            /*format=*/tensorFormat,
-            /*dataType=*/dataType,
-            /*batch_size=*/inputDim[0],
-            /*channels=*/inputDim[1],
-            /*image_height=*/inputDim[2],
-            /*image_width=*/inputDim[3]));
-
-        Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mGradTensorDesc,
-            /*format=*/tensorFormat,
-            /*dataType=*/dataType,
-            /*batch_size=*/inputDim[0],
-            /*channels=*/yTensorDim[1],
-            /*image_height=*/yTensorDim[2],
-            /*image_width=*/yTensorDim[3]));
-        
-        const int requestedAlgoCount = 1;
-        int returnedAlgoCount;
-
-        Utils::checkCudnnError(cudnnFindConvolutionBackwardDataAlgorithm(
-            /*cudnnHandle_t                          */mHandle,
-            /*const cudnnFilterDescriptor_t          */mFilterDesc,
-            /*const cudnnTensorDescriptor_t          */mGradTensorDesc,
-            /*const cudnnConvolutionDescriptor_t     */mConvDesc,
-            /*const cudnnTensorDescriptor_t          */mInputTensorDesc,
-            /*const int                              */requestedAlgoCount,
-            /*int* */&returnedAlgoCount,
-            /*cudnnConvolutionBwdDataAlgoPerf_t* */&mBwdDPerf));
-
-        Utils::checkCudnnError(cudnnFindConvolutionBackwardFilterAlgorithm(
-            mHandle, 
-            mInputTensorDesc,
-            mGradTensorDesc,
-            mConvDesc,
-            mFilterDesc,
-            requestedAlgoCount,
-            &returnedAlgoCount,
-            &mBwdFPerf));
-
-        mDataGradWorkspaceSize = std::max(mBwdDPerf.memory, mBwdFPerf.memory);
-
-        if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << std::format("{} backpropagation descriptor setup completed. Workspace size: {}", mName, mDataGradWorkspaceSize) << std::endl;
-
-        if (mDataGradWorkspaceSize > 0)
-        {
-            Utils::checkCudaError(cudaMalloc(&mDataGradWorkspacePtr, mDataGradWorkspaceSize));
-        }
-
-        _setupBackPropagation(needDataGrad);
+        _setupBackPropagation();
     }
 }
 
@@ -561,12 +560,99 @@ void ConvBiasAct::loadParameters(const std::filesystem::path& dir, std::string_v
     mBiasSurface->hostToDevSync();
 }
 
-void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
+void ConvBiasAct::_setupBackPropagation()
 {
-    mGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
-    mBiasGradSurface = std::make_unique<Surface<float>>(mBiasSurface->n_elems, 0.0f);
-    mWeightsGradSurface = std::make_unique<Surface<float>>(mWeightsSurface->n_elems, 0.0f);
-    mActivationGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
+    _setupActivationBackPropagation();
+    _setupBiasBackPropagation();
+    _setupDataBackPropagation();
+    _setupFilterBackPropagation();
+    _setupBackPropagationAlgorithms();
+
+    //auto inputDim = mPreviousLayer->getOutputTensor().getDim();
+    //auto outputDim = mOutputTensor->getDim();
+
+    //Utils::checkCudnnError(cudnnCreateFilterDescriptor(&mFilterDesc));
+    //Utils::checkCudnnError(cudnnSetFilter4dDescriptor(mFilterDesc,
+    //    /*dataType=*/mDataType,
+    //    /*format=*/mTensorFormat,
+    //    /*out_channels=*/mFilterSize,
+    //    /*in_channels=*/inputDim[1],
+    //    /*kernel_height=*/mKernelSize,
+    //    /*kernel_width=*/mKernelSize)); // most of convolution requires square kernels - change if needed
+
+    //Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mBiasGradTensorDesc));
+    //Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mBiasGradTensorDesc,
+    //    mTensorFormat,
+    //    mDataType,
+    //    1, mFilterSize,
+    //    1, 1));
+
+    //Utils::checkCudnnError(cudnnCreateConvolutionDescriptor(&mConvDesc));
+    //Utils::checkCudnnError(cudnnSetConvolution2dDescriptor(mConvDesc,
+    //    /*pad_height=*/mPad[0],
+    //    /*pad_width=*/mPad[1],
+    //    /*vertical_stride=*/mConvStride[0],
+    //    /*horizontal_stride=*/mConvStride[1],
+    //    /*dilation_height=*/mDilation[0],
+    //    /*dilation_width=*/mDilation[1],
+    //    /*mode=*/mConvMode,
+    //    /*computeType=*/mDataType));
+
+    //Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mInputTensorDesc));
+    //Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mGradTensorDesc));
+
+    //Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mInputTensorDesc,
+    //    /*format=*/mTensorFormat,
+    //    /*dataType=*/mDataType,
+    //    /*batch_size=*/inputDim[0],
+    //    /*channels=*/inputDim[1],
+    //    /*image_height=*/inputDim[2],
+    //    /*image_width=*/inputDim[3]));
+
+    //Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mGradTensorDesc,
+    //    /*format=*/mTensorFormat,
+    //    /*dataType=*/mDataType,
+    //    /*batch_size=*/outputDim[0],
+    //    /*channels=*/outputDim[1],
+    //    /*image_height=*/outputDim[2],
+    //    /*image_width=*/outputDim[3]));
+
+    //constexpr int requestedAlgoCount = 1;
+    //int returnedAlgoCount;
+
+    //Utils::checkCudnnError(cudnnFindConvolutionBackwardDataAlgorithm(
+    //    /*cudnnHandle_t                          */mHandle,
+    //    /*const cudnnFilterDescriptor_t          */mFilterDesc,
+    //    /*const cudnnTensorDescriptor_t          */mGradTensorDesc,
+    //    /*const cudnnConvolutionDescriptor_t     */mConvDesc,
+    //    /*const cudnnTensorDescriptor_t          */mInputTensorDesc,
+    //    /*const int                              */requestedAlgoCount,
+    //    /*int* */&returnedAlgoCount,
+    //    /*cudnnConvolutionBwdDataAlgoPerf_t* */&mBwdDPerf));
+
+    //Utils::checkCudnnError(cudnnFindConvolutionBackwardFilterAlgorithm(
+    //    mHandle,
+    //    mInputTensorDesc,
+    //    mGradTensorDesc,
+    //    mConvDesc,
+    //    mFilterDesc,
+    //    requestedAlgoCount,
+    //    &returnedAlgoCount,
+    //    &mBwdFPerf));
+
+    //mDataGradWorkspaceSize = std::max(mBwdDPerf.memory, mBwdFPerf.memory);
+
+    //if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << std::format("{} backpropagation descriptor setup completed. Workspace size: {}", mName, mDataGradWorkspaceSize) << std::endl;
+
+    //if (mDataGradWorkspaceSize > 0)
+    //{
+    //    Utils::checkCudaError(cudaMalloc(&mDataGradWorkspacePtr, mDataGradWorkspaceSize));
+    //}
+
+    //mGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
+    //mBiasGradSurface = std::make_unique<Surface<float>>(mBiasSurface->n_elems, 0.0f);
+    //mWeightsGradSurface = std::make_unique<Surface<float>>(mWeightsSurface->n_elems, 0.0f);
+    //mActivationGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
 
     if (mHyperparameters.updateType == Hyperparameters::UpdateType::mSGD)
     {
@@ -574,28 +660,70 @@ void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
         mSGD.mGradFilterVelocitySurface = std::make_unique<Surface<float>>(mWeightsSurface->n_elems, 0.0f);
     }
 
+    //try
+    //{
+    //    //auto gradTensor = cudnn_frontend::TensorBuilder()
+    //    //    .setAlignment(mOutputTensor->getAlignment())
+    //    //    .setDataType(mDataType)
+    //    //    .setDim(mOutputTensor->getDimCount(), mOutputTensor->getDim())
+    //    //    .setStride(mOutputTensor->getDimCount(), mOutputTensor->getStride())
+    //    //    .setId(generateTensorId())
+    //    //    .build();
+    //    auto gradTensor = Utils::createTensor(mOutputTensor->getDimCount(), mOutputTensor->getDim(), generateTensorId());
+    //    //auto after_activation_tensor = cudnn_frontend::TensorBuilder()
+    //    //    .setAlignment(mOutputTensor->getAlignment())
+    //    //    .setDataType(mDataType)
+    //    //    .setDim(mOutputTensor->getDimCount(), mOutputTensor->getDim())
+    //    //    .setStride(mOutputTensor->getDimCount(), mOutputTensor->getStride())
+    //    //    .setId(generateTensorId())
+    //    //    .build();
+    //    auto after_activation_tensor = Utils::createTensor(mOutputTensor->getDimCount(), mOutputTensor->getDim(), generateTensorId());
+    //    // backwards relu
+    //    auto actDesc = cudnn_frontend::PointWiseDescBuilder()
+    //        .setMode(CUDNN_POINTWISE_RELU_BWD)
+    //        .setComputeType(mDataType)
+    //        .build();
+    //    if (mVerbosityLevel >= VERBOSITY::DEBUG) std::cout << actDesc.describe() << std::endl;
+    //    auto act_op = cudnn_frontend::OperationBuilder(CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
+    //        .setdyDesc(gradTensor)
+    //        .setxDesc(*mOutputTensor)
+    //        .setdxDesc(after_activation_tensor)
+    //        .setpwDesc(actDesc)
+    //        .build();
+    //    if (mVerbosityLevel >= VERBOSITY::DEBUG) std::cout << act_op.describe() << std::endl;
+    //    std::vector<cudnn_frontend::Operation const*> ops;
+    //    ops.emplace_back(&act_op);
+    //    std::vector<void*> data_ptrs;
+    //    data_ptrs.emplace_back(mGradSurface->devPtr);
+    //    data_ptrs.emplace_back(mOutputSurface->devPtr);
+    //    data_ptrs.emplace_back(mActivationGradSurface->devPtr);
+    //    std::vector<int64_t> uids;
+    //    uids.emplace_back(gradTensor.getId());
+    //    uids.emplace_back(mOutputTensor->getId());
+    //    uids.emplace_back(after_activation_tensor.getId());
+    //    _setPlan(ops, data_ptrs, uids, mActivationGradPlan, mActivationGradVariantPack, mActivationGradWorkspaceSize, mActivationGradWorkspacePtr);
+    //}
+    //catch (cudnn_frontend::cudnnException& e) {
+    //    std::cout << "[ERROR] Exception " << e.what() << std::endl;
+    //    assert(false);
+    //}
+}
+
+void ConvBiasAct::_setupActivationBackPropagation()
+{
+    mGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
+    mActivationGradSurface = std::make_unique<Surface<float>>(mOutputSurface->n_elems, 0.0f);
+
     try
     {
-        auto gradTensor = cudnn_frontend::TensorBuilder()
-            .setAlignment(mOutputTensor->getAlignment())
-            .setDataType(CUDNN_DATA_FLOAT)
-            .setDim(mOutputTensor->getDimCount(), mOutputTensor->getDim())
-            .setStride(mOutputTensor->getDimCount(), mOutputTensor->getStride())
-            .setId(generateTensorId())
-            .build();
+        auto gradTensor = Utils::createTensor(mOutputTensor->getDimCount(), mOutputTensor->getDim(), generateTensorId());
 
-        auto after_activation_tensor = cudnn_frontend::TensorBuilder()
-            .setAlignment(mOutputTensor->getAlignment())
-            .setDataType(CUDNN_DATA_FLOAT)
-            .setDim(mOutputTensor->getDimCount(), mOutputTensor->getDim())
-            .setStride(mOutputTensor->getDimCount(), mOutputTensor->getStride())
-            .setId(generateTensorId())
-            .build();
+        auto after_activation_tensor = Utils::createTensor(mOutputTensor->getDimCount(), mOutputTensor->getDim(), generateTensorId());
 
         // backwards relu
         auto actDesc = cudnn_frontend::PointWiseDescBuilder()
             .setMode(CUDNN_POINTWISE_RELU_BWD)
-            .setComputeType(CUDNN_DATA_FLOAT)
+            .setComputeType(mDataType)
             .build();
         if (mVerbosityLevel >= VERBOSITY::DEBUG) std::cout << actDesc.describe() << std::endl;
 
@@ -629,14 +757,100 @@ void ConvBiasAct::_setupBackPropagation(bool needDataGrad)
 
 void ConvBiasAct::_setupBiasBackPropagation()
 {
+    mBiasGradSurface = std::make_unique<Surface<float>>(mBiasSurface->n_elems, 0.0f);
+    Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mBiasGradTensorDesc));
+    Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mBiasGradTensorDesc,
+        mTensorFormat,
+        mDataType,
+        1, mFilterSize,
+        1, 1));
 }
 
-void ConvBiasAct::_setupWeightBackPropagation()
+void ConvBiasAct::_setupFilterBackPropagation()
 {
+    auto inputDim = mPreviousLayer->getOutputTensor().getDim();
+    auto outputDim = mOutputTensor->getDim();
+    mWeightsGradSurface = std::make_unique<Surface<float>>(mWeightsSurface->n_elems, 0.0f);
+
+    Utils::checkCudnnError(cudnnCreateFilterDescriptor(&mFilterDesc));
+    Utils::checkCudnnError(cudnnSetFilter4dDescriptor(mFilterDesc,
+        /*dataType=*/mDataType,
+        /*format=*/mTensorFormat,
+        /*out_channels=*/mFilterSize,
+        /*in_channels=*/inputDim[1],
+        /*kernel_height=*/mKernelSize,
+        /*kernel_width=*/mKernelSize)); // most of convolution requires square kernels - change if needed
+
+    Utils::checkCudnnError(cudnnCreateConvolutionDescriptor(&mConvDesc));
+    Utils::checkCudnnError(cudnnSetConvolution2dDescriptor(mConvDesc,
+        /*pad_height=*/mPad[0],
+        /*pad_width=*/mPad[1],
+        /*vertical_stride=*/mConvStride[0],
+        /*horizontal_stride=*/mConvStride[1],
+        /*dilation_height=*/mDilation[0],
+        /*dilation_width=*/mDilation[1],
+        /*mode=*/mConvMode,
+        /*computeType=*/mDataType));
 }
 
 void ConvBiasAct::_setupDataBackPropagation()
 {
+    auto inputDim = mPreviousLayer->getOutputTensor().getDim();
+    auto outputDim = mOutputTensor->getDim();
+
+    Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mInputTensorDesc));
+    Utils::checkCudnnError(cudnnCreateTensorDescriptor(&mGradTensorDesc));
+
+    Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mInputTensorDesc,
+        /*format=*/mTensorFormat,
+        /*dataType=*/mDataType,
+        /*batch_size=*/inputDim[0],
+        /*channels=*/inputDim[1],
+        /*image_height=*/inputDim[2],
+        /*image_width=*/inputDim[3]));
+
+    Utils::checkCudnnError(cudnnSetTensor4dDescriptor(mGradTensorDesc,
+        /*format=*/mTensorFormat,
+        /*dataType=*/mDataType,
+        /*batch_size=*/outputDim[0],
+        /*channels=*/outputDim[1],
+        /*image_height=*/outputDim[2],
+        /*image_width=*/outputDim[3]));
+}
+
+void ConvBiasAct::_setupBackPropagationAlgorithms()
+{
+    constexpr int requestedAlgoCount = 1;
+    int returnedAlgoCount;
+
+    Utils::checkCudnnError(cudnnFindConvolutionBackwardDataAlgorithm(
+        /*cudnnHandle_t                          */mHandle,
+        /*const cudnnFilterDescriptor_t          */mFilterDesc,
+        /*const cudnnTensorDescriptor_t          */mGradTensorDesc,
+        /*const cudnnConvolutionDescriptor_t     */mConvDesc,
+        /*const cudnnTensorDescriptor_t          */mInputTensorDesc,
+        /*const int                              */requestedAlgoCount,
+        /*int* */&returnedAlgoCount,
+        /*cudnnConvolutionBwdDataAlgoPerf_t* */&mBwdDPerf));
+
+    Utils::checkCudnnError(cudnnFindConvolutionBackwardFilterAlgorithm(
+        mHandle,
+        mInputTensorDesc,
+        mGradTensorDesc,
+        mConvDesc,
+        mFilterDesc,
+        requestedAlgoCount,
+        &returnedAlgoCount,
+        &mBwdFPerf));
+
+    mDataGradWorkspaceSize = std::max(mBwdDPerf.memory, mBwdFPerf.memory);
+
+    if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << std::format("{} backpropagation descriptor setup completed. Workspace size: {}", mName, mDataGradWorkspaceSize) << std::endl;
+
+    if (mDataGradWorkspaceSize > 0)
+    {
+        Utils::checkCudaError(cudaMalloc(&mDataGradWorkspacePtr, mDataGradWorkspaceSize));
+    }
 }
 
 void ConvBiasAct::_SGDUpdate()

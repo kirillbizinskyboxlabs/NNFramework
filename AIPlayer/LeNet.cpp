@@ -36,7 +36,7 @@ namespace LeNet
 
         //bool verbose = false;
 
-        VERBOSITY verbosity = verbose ? VERBOSITY::INFO : VERBOSITY::MIN;
+        VERBOSITY verbosity = verbose ? VERBOSITY::REACH_INFO : VERBOSITY::MIN;
 
         MNISTDataHolder dh;
         dh.initialize();
@@ -127,7 +127,7 @@ namespace LeNet
                 iter++;
             }
 
-            nn.saveParameters(); // TODO: make conditional?
+            //nn.saveParameters(); // TODO: make conditional?
         }
         else
         {

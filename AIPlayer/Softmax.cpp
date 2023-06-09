@@ -61,13 +61,16 @@ Softmax::Softmax(cudnnHandle_t& handle,
         stride);
 
     // we need to define output
-    mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
-        .setDim(nbDims, inputDim)
-        .setStride(nbDims, inputTensor.getStride())
-        .setId(generateTensorId())
-        .setAlignment(16)
-        .setDataType(CUDNN_DATA_FLOAT)
-        .build());
+    //mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
+    //    .setDim(nbDims, inputDim)
+    //    .setStride(nbDims, inputTensor.getStride())
+    //    .setId(generateTensorId())
+    //    .setAlignment(16)
+    //    .setDataType(CUDNN_DATA_FLOAT)
+    //    .build());
+
+    mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(Utils::createTensor(nbDims, inputDim, generateTensorId()));
+
 
     if (mVerbosityLevel == VERBOSITY::REACH_INFO)
     {

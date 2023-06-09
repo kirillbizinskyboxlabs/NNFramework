@@ -11,8 +11,8 @@ void testDataRetrieval();
 
 int main()
 {
-    //LeNet::Lenet(true, false);
-    LeNet::Lenet(false, false);
+    LeNet::Lenet(true, true);
+    //LeNet::Lenet(false, false);
 }
 
 void testDataRetrieval()
