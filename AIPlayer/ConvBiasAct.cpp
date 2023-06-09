@@ -58,10 +58,26 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
 
     int64_t Ysize = yTensorDim[0] * yTensorDim[1] * yTensorDim[2] * yTensorDim[3];
 
-    constexpr float biasStartValue = 0.0001f;
+    // Heperparameters
+    //constexpr float biasStartValue = 0.0001f;
+    //constexpr float XavierNumerator = 3.0f;
 
-    mWeightsSurface = std::make_unique<Surface<float>>(wTensorDim[0] * wTensorDim[1] * wTensorDim[2] * wTensorDim[3]);
-    mBiasSurface = std::make_unique<Surface<float>>(bTensorDim[0] * bTensorDim[1] * bTensorDim[2] * bTensorDim[3], biasStartValue);
+    // Xavier filter values
+    auto XavierInitializer = [inputChannels = inputDim[1], kernelSize, XavierNumerator = mHyperparameters.XavierNumerator](size_t size, float* hostPtr)
+    {
+        std::random_device dev;
+        std::mt19937 gen(dev());
+        const float deviation = sqrt(XavierNumerator / (inputChannels * kernelSize * kernelSize));
+        std::uniform_real_distribution<float> distribution(-deviation, deviation);
+
+        for (size_t i = 0; i < size; ++i)
+        {
+            hostPtr[i] = distribution(gen);
+        }
+    };
+
+    mWeightsSurface = std::make_unique<Surface<float>>(wTensorDim[0] * wTensorDim[1] * wTensorDim[2] * wTensorDim[3], XavierInitializer);
+    mBiasSurface = std::make_unique<Surface<float>>(bTensorDim[0] * bTensorDim[1] * bTensorDim[2] * bTensorDim[3], mHyperparameters.biasStartValue);
     mOutputSurface = std::make_unique<Surface<float>>(Ysize, 0.0f);
 
     if (mVerbosityLevel >= VERBOSITY::INFO)
@@ -77,20 +93,18 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
         std::cout << std::format("output dims are {}, {}, {}, {}", yTensorDim[0], yTensorDim[1], yTensorDim[2], yTensorDim[3]) << std::endl;
     }
 
-    // TODO: move to Surface?
-    // Xavier filter values
-    std::random_device dev;
-    std::mt19937 gen(dev());
-    const float deviation = sqrt(3.0f / (inputDim[1] * kernelSize * kernelSize)); // input channels * KS^2
-    //const float deviation = 1.0f / (inputDim[1] * kernelSize * kernelSize); // input channels * KS^2
-    std::uniform_real_distribution<float> distribution(-deviation, deviation);
+    //std::random_device dev;
+    //std::mt19937 gen(dev());
+    //const float deviation = sqrt(3.0f / (inputDim[1] * kernelSize * kernelSize)); // input channels * KS^2
+    ////const float deviation = 1.0f / (inputDim[1] * kernelSize * kernelSize); // input channels * KS^2
+    //std::uniform_real_distribution<float> distribution(-deviation, deviation);
 
-    for (int64_t i = 0; i < mWeightsSurface->n_elems; ++i)
-    {
-        mWeightsSurface->hostPtr[i] = distribution(gen);
-    }
+    //for (int64_t i = 0; i < mWeightsSurface->n_elems; ++i)
+    //{
+    //    mWeightsSurface->hostPtr[i] = distribution(gen);
+    //}
 
-    mWeightsSurface->hostToDevSync();
+    //mWeightsSurface->hostToDevSync();
 
     try
     {
@@ -154,9 +168,7 @@ ConvBiasAct::ConvBiasAct(cudnnHandle_t& handle,
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO)
         {
             std::cout << mPreviousLayer->getOutputTensor().describe() << std::endl;
-            //std::cout << wTensor.describe() << std::endl;
             std::cout << filterTensor.describe() << std::endl;
-            //std::cout << bTensor.describe() << std::endl;
             std::cout << biasTensor.describe() << std::endl;
             std::cout << afterConvTensor.describe() << std::endl;
             std::cout << afterBiasTensor.describe() << std::endl;

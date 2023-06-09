@@ -13,6 +13,7 @@ Softmax::Softmax(cudnnHandle_t& handle,
     VERBOSITY verbosity)
     : Layer(handle, previousLayer, hyperparameters, std::move(name), verbosity)
 {
+    // Can be moved to Layer??
     if (mVerbosityLevel >= VERBOSITY::INFO)
     {
         std::cout << std::format("Creating {} Layer", mName) << std::endl;
@@ -101,10 +102,6 @@ void Softmax::propagateForward()
     if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << cudnnGetErrorString(status) << std::endl;
-    }
-
-    if (mVerbosityLevel >= VERBOSITY::DEBUG)
-    {
         printOutput();
     }
 }
@@ -158,36 +155,21 @@ void Softmax::propagateBackward()
     if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {
         std::cout << "Softmax backprop" << std::endl;
-    }
-
-    if (mVerbosityLevel >= VERBOSITY::DEBUG)
-    {
         printGrad();
     }
 
-    try {
-        auto status = cudnnSoftmaxBackward(
-            mHandle,
-            CUDNN_SOFTMAX_ACCURATE,
-            CUDNN_SOFTMAX_MODE_INSTANCE,
-            &alpha,
-            sftTensorDesc,
-            mOutputSurface->devPtr,
-            /*dyDesc*/ sftTensorDesc, // srcTensorDesc == sftTensorDesc, probably can be used interchangeably
-            /**dy*/ mGradSurface->devPtr, // we expect valid gradient to be populated. make a sanity check?
-            &beta,
-            srcTensorDesc, // that makes sense, right? it describes the data pointer in the other layer
-            mPreviousLayer->getGradSurface().devPtr); // next level in backprop chain needs the gradient
-
-        if (mVerbosityLevel >= VERBOSITY::DEBUG)
-        {
-            std::cout << cudnnGetErrorString(status) << std::endl;
-        }
-    }
-    catch (cudnn_frontend::cudnnException& e)
-    {
-        std::cout << std::format("Softmax backprop failed: {}", e.what()) << std::endl;
-    }
+    Utils::checkCudnnError(cudnnSoftmaxBackward(
+        mHandle,
+        CUDNN_SOFTMAX_ACCURATE,
+        CUDNN_SOFTMAX_MODE_INSTANCE,
+        &alpha,
+        sftTensorDesc,
+        mOutputSurface->devPtr,
+        /*dyDesc*/ sftTensorDesc, // srcTensorDesc == sftTensorDesc, probably can be used interchangeably
+        /**dy*/ mGradSurface->devPtr, // we expect valid gradient to be populated. make a sanity check?
+        &beta,
+        srcTensorDesc, // that makes sense, right? it describes the data pointer in the other layer
+        mPreviousLayer->getGradSurface().devPtr)); // next level in backprop chain needs the gradient
 
     if (mVerbosityLevel >= VERBOSITY::DEBUG)
     {

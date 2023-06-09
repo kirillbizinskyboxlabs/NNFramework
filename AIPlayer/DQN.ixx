@@ -4,6 +4,8 @@ module;
 
 export module DQN;
 
+import ExperienceReplay;
+
 export void DQNSnake()
 {
 

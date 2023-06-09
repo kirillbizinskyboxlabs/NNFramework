@@ -26,24 +26,38 @@ public:
         T_ELEM* hostPtr = nullptr;
         int64_t n_elems = 0;
 
-        explicit Surface(int64_t n_elems) 
+        explicit Surface(int64_t n_elems, bool needHostPtr = true) 
             : n_elems(n_elems) 
         {
             Utils::checkCudaError(cudaMalloc((void**)&(devPtr), (size_t)((n_elems) * sizeof(devPtr[0]))));
-            hostPtr = (T_ELEM*)calloc((size_t)n_elems, sizeof(hostPtr[0]));
-            Utils::initImage(hostPtr, n_elems);
-            Utils::checkCudaError(cudaMemcpy(devPtr, hostPtr, size_t(sizeof(hostPtr[0]) * n_elems), cudaMemcpyHostToDevice));
+
+            if (needHostPtr)
+            {
+                hostPtr = (T_ELEM*)calloc((size_t)n_elems, sizeof(hostPtr[0]));
+                Utils::initImage(hostPtr, n_elems); // default random initialization
+                Utils::checkCudaError(cudaMemcpy(devPtr, hostPtr, size_t(sizeof(hostPtr[0]) * n_elems), cudaMemcpyHostToDevice));
+                Utils::checkCudaError(cudaDeviceSynchronize());
+            }
+        }
+
+        explicit Surface(int64_t n_elems, T_ELEM fillValue)
+            : n_elems(n_elems)
+        {
+            Utils::checkCudaError(cudaMalloc((void**)&(devPtr), (size_t)((n_elems) * sizeof(devPtr[0]))));
+            hostPtr = (T_ELEM*)calloc(n_elems, sizeof(hostPtr[0]));
+            for (int i = 0; i < n_elems; i++) {
+                hostPtr[i] = fillValue;
+            }
+            Utils::checkCudaError(cudaMemcpy(devPtr, hostPtr, sizeof(hostPtr[0]) * n_elems, cudaMemcpyHostToDevice));
             Utils::checkCudaError(cudaDeviceSynchronize());
         }
 
-        explicit Surface(int64_t size, T_ELEM fillValue) 
-            : n_elems(size) 
+        explicit Surface(int64_t n_elems, std::function<void(size_t, T_ELEM*)> initializer)
+            : n_elems(n_elems)
         {
-            Utils::checkCudaError(cudaMalloc((void**)&(devPtr), (size) * sizeof(devPtr[0])));
-            hostPtr = (T_ELEM*)calloc(size, sizeof(hostPtr[0]));
-            for (int i = 0; i < size; i++) {
-                hostPtr[i] = fillValue;
-            }
+            Utils::checkCudaError(cudaMalloc((void**)&(devPtr), (size_t)((n_elems) * sizeof(devPtr[0]))));
+            hostPtr = (T_ELEM*)calloc((size_t)n_elems, sizeof(hostPtr[0]));
+            initializer((size_t)n_elems, hostPtr);
             Utils::checkCudaError(cudaMemcpy(devPtr, hostPtr, sizeof(hostPtr[0]) * n_elems, cudaMemcpyHostToDevice));
             Utils::checkCudaError(cudaDeviceSynchronize());
         }
@@ -60,25 +74,27 @@ public:
         }
 
         void devToHostSync() {
+            if (!hostPtr) return;
             cudaDeviceSynchronize();
             Utils::checkCudaError(cudaMemcpy(hostPtr, devPtr, sizeof(hostPtr[0]) * n_elems, cudaMemcpyDeviceToHost));
             cudaDeviceSynchronize();
         }
 
         void hostToDevSync() {
+            if (!hostPtr) return;
             cudaDeviceSynchronize();
             Utils::checkCudaError(cudaMemcpy(devPtr, hostPtr, sizeof(hostPtr[0]) * n_elems, cudaMemcpyHostToDevice));
             cudaDeviceSynchronize();
         }
     };
 
-    //virtual int executeInference();
-    virtual void propagateForward();
-    virtual void propagateBackward() = 0;
-
     const cudnn_frontend::Tensor& getOutputTensor() const;
     Surface<float>& getOutputSurface() const; // does this function makes sense to be const? Surface is expected to change
     Surface<float>& getGradSurface() const;
+
+    //virtual int executeInference();
+    virtual void propagateForward();
+    virtual void propagateBackward() = 0;
 
     virtual void printOutput();
     virtual void printGrad();

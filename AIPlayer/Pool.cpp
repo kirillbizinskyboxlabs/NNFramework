@@ -184,7 +184,7 @@ void Pool::_setupGrad()
         //    .setAlignment(alignment)
         //    .setDataType(dataType)
         //    .build();
-        auto gradTensor = Utils::createTensor(nbDims, inputTensor.getDim(), generateTensorId());
+        auto gradTensor = Utils::createTensor(nbDims, mOutputTensor->getDim(), generateTensorId());
 
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Setting poolBwdDesc" << std::endl;
         auto poolBwdDesc = cudnn_frontend::ResampleDescBuilder()
@@ -193,9 +193,9 @@ void Pool::_setupGrad()
             .setResampleMode(mPoolMode)
             .setPaddingMode(mPaddingMode)
             .setSpatialDim(mNbSpatialDims, mWindowDim.data())
-            .setSpatialStride(mNbSpatialDims, mWindowDim.data())
-            .setPrePadding(mNbSpatialDims, mWindowDim.data())
-            .setPostPadding(mNbSpatialDims, mWindowDim.data())
+            .setSpatialStride(mNbSpatialDims, mStride.data())
+            .setPrePadding(mNbSpatialDims, mPrePadding.data())
+            .setPostPadding(mNbSpatialDims, mPostPadding.data())
             .build();
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << poolBwdDesc.describe() << std::endl;
         // Create a Resample Node

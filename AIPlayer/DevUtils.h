@@ -67,6 +67,7 @@ struct Hyperparameters
     float beta = 0.0f;
 
     float biasStartValue = 0.0001f;
+    float XavierNumerator = 3.0f;
 
     // defaults
     const int64_t dilationA[2] = { 1, 1 };
