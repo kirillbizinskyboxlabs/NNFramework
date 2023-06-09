@@ -1,10 +1,22 @@
-#include "NeuralNetwork.h"
+module;
 
+//#include "NeuralNetwork.h"
+
+//#include "Layer.h"
 #include "ConvBiasAct.h"
 #include "CrossEnropy.h"
 #include "Input.h"
 #include "Pool.h"
 #include "Softmax.h"
+
+module NeuralNetwork;
+
+//import :Layer;
+//import :ConvBiasAct;
+//import :CrossEnropy;
+//import :Input;
+//import :Pool;
+//import :Softmax;
 
 constexpr char SAVE_DIR_ROOT[] = "saved_weights";
 

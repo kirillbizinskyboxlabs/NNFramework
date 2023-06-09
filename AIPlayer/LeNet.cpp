@@ -1,6 +1,7 @@
 module;
 
-#include "NeuralNetwork.h"
+//#include "NeuralNetwork.h"
+#include "DevUtils.h"
 
 module LeNet;
 
@@ -9,6 +10,7 @@ import <format>;
 import <cmath>;
 
 import MNISTData;
+import NeuralNetwork;
 
 namespace LeNet
 {
@@ -33,8 +35,6 @@ namespace LeNet
         constexpr int64_t FC7KernelSize = 1;
         constexpr int64_t FC7Padding = 0;
         constexpr int64_t FC7OutputSize = 10;
-
-        //bool verbose = false;
 
         VERBOSITY verbosity = verbose ? VERBOSITY::REACH_INFO : VERBOSITY::MIN;
 

@@ -1,7 +1,12 @@
-#pragma once
-#include "Layer.h"
+module;
 
-class Pool : public Layer
+#include <cudnn_frontend.h>
+
+export module NeuralNetwork:Pool;
+
+import :Layer;
+
+export class Pool : public Layer
 {
 public:
 	Pool(cudnnHandle_t& handle,
@@ -34,4 +39,3 @@ private:
 	const cudnn_frontend::cudnnResampleMode_t mPoolMode = cudnn_frontend::cudnnResampleMode_t::CUDNN_RESAMPLE_AVGPOOL_INCLUDE_PADDING;
 	const cudnn_frontend::cudnnPaddingMode_t mPaddingMode = cudnn_frontend::cudnnPaddingMode_t::CUDNN_ZERO_PAD;
 };
-

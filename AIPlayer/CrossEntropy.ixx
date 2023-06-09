@@ -1,14 +1,15 @@
-#pragma once
-#include "Layer.h"
+export module NeuralNetwork:CrossEntropy;
+
+import :Layer;
 
 import <ranges>;
 
-class CrossEntropy : public Layer
+export class CrossEntropy : public Layer
 {
 public:
-	CrossEntropy(cudnnHandle_t& handle, 
-		Layer* previousLayer, 
-		const Hyperparameters& hyperparameters, 
+	CrossEntropy(cudnnHandle_t& handle,
+		Layer* previousLayer,
+		const Hyperparameters& hyperparameters,
 		std::string name = "CrossEntropy",
 		VERBOSITY verbosity = VERBOSITY::MIN);
 	~CrossEntropy();
@@ -37,7 +38,7 @@ private:
 
 	std::unique_ptr<Surface<float>> mProductSurface; // matmul output holder, internal
 
-	std::unique_ptr<Surface<float>> mLabelSurface; 
+	std::unique_ptr<Surface<float>> mLabelSurface;
 	std::unique_ptr<Surface<float>> mLossSurface;
 
 	std::unique_ptr<cudnn_frontend::ExecutionPlan> mGradPlan;

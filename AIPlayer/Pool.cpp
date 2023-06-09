@@ -1,4 +1,5 @@
 #include "Pool.h"
+//module NeuralNetwork:Pool;
 
 import <format>;
 import <iostream>;
@@ -19,18 +20,12 @@ Pool::Pool(cudnnHandle_t& handle,
     , mStride(mNbSpatialDims, stride)
 {
     int64_t poolTensorDim[] = { 0, 0, 0, 0 };
-    auto& inputTensor = mPreviousLayer->getOutputTensor();
-    auto inputDim = inputTensor.getDim();
+    const auto& inputTensor = mPreviousLayer->getOutputTensor();
+    const auto inputDim = inputTensor.getDim();
     poolTensorDim[0] = inputDim[0];
     poolTensorDim[1] = inputDim[1];
     poolTensorDim[2] = inputDim[2] / 2;
     poolTensorDim[3] = inputDim[3] / 2;
-
-    // TODO: Default parameters need to have a proper place
-    //constexpr int64_t windowDimPool[CUDNN_DIM_MAX] = { 2,2 };
-    //constexpr int64_t prePaddingPool[CUDNN_DIM_MAX] = { 0,0 };
-    //constexpr int64_t postPaddingPool[CUDNN_DIM_MAX] = { 0,0 };
-    //constexpr int64_t stridePool[CUDNN_DIM_MAX] = { 2,2 };
 
     if (mVerbosityLevel >= VERBOSITY::INFO)
     {
@@ -42,7 +37,7 @@ Pool::Pool(cudnnHandle_t& handle,
         std::cout << std::format("After pool dims are {}, {}, {}, {}", poolTensorDim[0], poolTensorDim[1], poolTensorDim[2], poolTensorDim[3]) << std::endl;
     }
 
-    int64_t Psize = poolTensorDim[0] * poolTensorDim[1] * poolTensorDim[2] * poolTensorDim[3];
+    const int64_t Psize = poolTensorDim[0] * poolTensorDim[1] * poolTensorDim[2] * poolTensorDim[3];
     mOutputSurface = std::make_unique<Surface<float>>(Psize, 0.0f);
     mGradSurface = std::make_unique<Surface<float>>(Psize, 0.0f);
 
@@ -53,30 +48,7 @@ Pool::Pool(cudnnHandle_t& handle,
 
     try
     {
-        // TODO: Defaults, place
-        //constexpr int64_t alignment = 16;
-        //cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-        //cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-        //float alpha = 1.0f;
-        //float beta = 0.0f;
-
         constexpr int64_t nbDims = 4;
-
-        //int64_t stride[nbDims];
-
-        //auto const nanOpt = CUDNN_PROPAGATE_NAN; //CUDNN_NOT_PROPAGATE_NAN
-        //constexpr int64_t nbSpatialDims = 2;
-        //cudnn_frontend::cudnnResampleMode_t const mode = cudnn_frontend::cudnnResampleMode_t::CUDNN_RESAMPLE_AVGPOOL_INCLUDE_PADDING;
-        //cudnn_frontend::cudnnPaddingMode_t const padding_mode = cudnn_frontend::cudnnPaddingMode_t::CUDNN_ZERO_PAD;
-
-        //Utils::generateStrides(poolTensorDim, stride, nbDims, tensorFormat);
-        //mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
-        //    .setDim(nbDims, poolTensorDim)
-        //    .setStride(nbDims, stride)
-        //    .setId(generateTensorId())
-        //    .setAlignment(alignment)
-        //    .setDataType(dataType)
-        //    .build());
 
         mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(Utils::createTensor(nbDims, poolTensorDim, generateTensorId()));
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << mOutputTensor->describe() << std::endl;
@@ -144,46 +116,12 @@ void Pool::propagateBackward()
 void Pool::_setupGrad()
 {
     auto& inputTensor = mPreviousLayer->getOutputTensor();
-
-    // TODO: Defaults, place
-    //constexpr int64_t alignment = 16;
-    //cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-    //cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-    //float alpha = 1.0f;
-    //float beta = 0.0f;
-    // TODO: Default parameters need to have a proper place
-    //constexpr int64_t windowDimPool[CUDNN_DIM_MAX] = { 2,2 };
-    //constexpr int64_t prePaddingPool[CUDNN_DIM_MAX] = { 0,0 };
-    //constexpr int64_t postPaddingPool[CUDNN_DIM_MAX] = { 0,0 };
-    //constexpr int64_t stridePool[CUDNN_DIM_MAX] = { 2,2 };
-
     constexpr int64_t nbDims = 4;
-
-    //auto const nanOpt = CUDNN_NOT_PROPAGATE_NAN;
-    //constexpr int64_t nbSpatialDims = 2;
-    //cudnn_frontend::cudnnResampleMode_t const mode = cudnn_frontend::cudnnResampleMode_t::CUDNN_RESAMPLE_AVGPOOL_INCLUDE_PADDING;
-    //cudnn_frontend::cudnnPaddingMode_t const padding_mode = cudnn_frontend::cudnnPaddingMode_t::CUDNN_ZERO_PAD;
-
-    //int64_t stride[nbDims];
 
     try
     {
-        //auto inputGradTensor = cudnn_frontend::TensorBuilder()
-        //    .setDim(nbDims, inputTensor.getDim())
-        //    .setStride(nbDims, inputTensor.getStride())
-        //    .setId(generateTensorId())
-        //    .setAlignment(alignment)
-        //    .setDataType(dataType)
-        //    .build();
-        auto inputGradTensor = Utils::createTensor(nbDims, inputTensor.getDim(), generateTensorId());
 
-        //auto gradTensor = cudnn_frontend::TensorBuilder()
-        //    .setDim(nbDims, mOutputTensor->getDim())
-        //    .setStride(nbDims, mOutputTensor->getStride())
-        //    .setId(generateTensorId())
-        //    .setAlignment(alignment)
-        //    .setDataType(dataType)
-        //    .build();
+        auto inputGradTensor = Utils::createTensor(nbDims, inputTensor.getDim(), generateTensorId());
         auto gradTensor = Utils::createTensor(nbDims, mOutputTensor->getDim(), generateTensorId());
 
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << "Setting poolBwdDesc" << std::endl;

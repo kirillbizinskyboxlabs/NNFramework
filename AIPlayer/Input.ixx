@@ -1,7 +1,8 @@
-#pragma once
-#include "Layer.h"
+export module NeuralNetwork:Input;
 
-import <ranges>;
+//#pragma once
+//#include "Layer.h"
+import :Layer;
 
 class Input : public Layer
 {

@@ -1,10 +1,11 @@
-#pragma once
-#include "Layer.h"
+export module NeuralNetwork:Softmax;
 
-class Softmax : public Layer
+import :Layer;
+
+export class Softmax : public Layer
 {
 public:
-	Softmax(cudnnHandle_t& handle, 
+	Softmax(cudnnHandle_t& handle,
 		Layer* previousLayer,
 		const Hyperparameters& hyperparameters,
 		std::string name = "Softmax",

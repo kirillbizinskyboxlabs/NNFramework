@@ -1,7 +1,10 @@
 #include "CrossEnropy.h"
+//module;
+#include <iomanip>
+
+//module NeuralNetwork:CrossEntropy;
 
 import <format>;
-#include <iomanip>
 
 CrossEntropy::CrossEntropy(cudnnHandle_t& handle, 
     Layer* previousLayer, 
@@ -160,15 +163,11 @@ void CrossEntropy::syncLabel()
 void CrossEntropy::_initLoss()
 {
     //TODO: rename
-    //auto inputTensor = _flattenTensor(mPreviousLayer->getOutputTensor());
     auto inputTensor = Utils::flattenTensor(mPreviousLayer->getOutputTensor(), generateTensorId()); // not really necessary - we flatten the tensor in softmax. It shouldn't hurt though. Better safe than sorry?
     auto inputDim = inputTensor.getDim();
     mBatchSize = inputDim[0];
     assert(inputDim[1] == 1); //sanity check // TODO: multidimensional cross-entropy?
     mNumClasses = inputDim[2]; //we expect it to be flatten // TODO: sanity check?
-    //mNumClasses = inputDim[1];
-    //assert(inputDim[2] == 1); // TODO: rethink
-    //assert(inputDim[3] == 1);
     const int64_t reshapedInputDim[] = { mBatchSize, 1, mNumClasses };
     const int64_t crossEntropyLabelDim[] = { mBatchSize, mNumClasses, 1 }; // we need it to be orthogonal to softmax output, so that we can have a working dot product
     const int64_t crossEntropyLabelStride[] = { mNumClasses, 1, 1 }; // does that makes sense?
@@ -177,8 +176,6 @@ void CrossEntropy::_initLoss()
 
     mProductSurface = std::make_unique<Surface<float>>(matmulDim[0] * matmulDim[1] * matmulDim[2], 0.0f);
 
-    //int64_t labelStride[] = { mNumClasses, mNumClasses, 1 }; // does this?
-
     int64_t lossDim[] = { 1, 1, 1 }; // I think it should be that since we need to have an average across dims including the batch
     int64_t lossStride[] = { 1,1,1 }; // not sure if this makes sense
     mLossSurface = std::make_unique<Surface<float>>(lossDim[0] * lossDim[1] * lossDim[2], 0.0f);
@@ -186,7 +183,6 @@ void CrossEntropy::_initLoss()
     mLabelSurface = std::make_unique<Surface<float>>(mBatchSize * mNumClasses, 0.0f);
 
     // HYPERPARAMETERS
-    //constexpr int64_t alignment = 16;
     const cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
     constexpr int64_t nbDims = 3;
 
@@ -196,46 +192,16 @@ void CrossEntropy::_initLoss()
 
     try
     {
-        //auto crossEntropyLabelTensor = TensorBuilder()
-        //    .setDataType(dataType)
-        //    .setAlignment(alignment) // this needs to be a function
-        //    .setDim(nbDims, crossEntropyLabelDim)
-        //    .setStride(nbDims, crossEntropyLabelStride)
-        //    .setId(generateTensorId())
-        //    .build();
+
         auto crossEntropyLabelTensor = Utils::createTensor(nbDims, crossEntropyLabelDim, generateTensorId());
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << crossEntropyLabelTensor.describe() << std::endl;
 
-        //auto afterProductTensor = TensorBuilder()
-        //    .setDataType(dataType)
-        //    .setAlignment(alignment)
-        //    .setDim(nbDims, matmulDim)
-        //    .setStride(nbDims, matmulStride)
-        //    .setId(generateTensorId())
-        //    //.setVirtual(true) // apparently it cannot be virtual 
-        //    .build();
         auto afterProductTensor = Utils::createTensor(nbDims, matmulDim, generateTensorId());
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << afterProductTensor.describe() << std::endl;
 
-        //auto afterLogTensor = TensorBuilder()
-        //    .setDataType(dataType)
-        //    .setAlignment(alignment)
-        //    .setDim(nbDims, matmulDim)
-        //    .setStride(nbDims, matmulStride)
-        //    .setId(generateTensorId())
-        //    .setVirtual(true)
-        //    .build();
         auto afterLogTensor = Utils::createTensor(nbDims, matmulDim, generateTensorId(), true);
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << afterLogTensor.describe() << std::endl;
 
-        // the output
-        //auto lossTensor = TensorBuilder()
-        //    .setDataType(dataType)
-        //    .setAlignment(alignment)
-        //    .setDim(nbDims, lossDim)
-        //    .setStride(nbDims, lossStride)
-        //    .setId(generateTensorId())
-        //    .build();
         auto lossTensor = Utils::createTensor(nbDims, lossDim, generateTensorId());
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << lossTensor.describe() << std::endl;
 
@@ -290,7 +256,6 @@ void CrossEntropy::_initLoss()
         data_ptrs.emplace_back(mLossSurface->devPtr);
 
         std::vector<int64_t> uids;
-        //uids.emplace_back(mPreviousLayer->getOutputTensor().getId());
         uids.emplace_back(inputTensor.getId());
         uids.emplace_back(crossEntropyLabelTensor.getId());
         uids.emplace_back(afterProductTensor.getId());
@@ -306,10 +271,8 @@ void CrossEntropy::_initLoss()
 void CrossEntropy::_initGrad()
 {
     // TODO: rename
-    //auto inputTensor = _flattenTensor(mPreviousLayer->getOutputTensor());
      auto inputTensor = Utils::flattenTensor(mPreviousLayer->getOutputTensor(), generateTensorId());
     // TODO: Proper defaults
-    constexpr int64_t alignment = 16;
     const cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
     constexpr int64_t nbDims = 3;
 
@@ -323,23 +286,10 @@ void CrossEntropy::_initGrad()
     if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << inputTensor.describe() << std::endl;
     try
     {
-        //auto labelTensor = TensorBuilder()
-        //    .setDataType(dataType)
-        //    .setAlignment(alignment)
-        //    .setId(generateTensorId())
-        //    .setDim(nbDims, gradDim)
-        //    .setStride(nbDims, gradStride)
-        //    .build();
+
         auto labelTensor = Utils::createTensor(nbDims, gradDim, generateTensorId());
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << labelTensor.describe() << std::endl;
 
-        //auto gradTensor = TensorBuilder()
-        //    .setDataType(dataType)
-        //    .setAlignment(alignment)
-        //    .setId(generateTensorId())
-        //    .setDim(nbDims, gradDim)
-        //    .setStride(nbDims, gradStride)
-        //    .build();
         auto gradTensor = Utils::createTensor(nbDims, gradDim, generateTensorId());
         if (mVerbosityLevel >= VERBOSITY::REACH_INFO) std::cout << gradTensor.describe() << std::endl;
 
@@ -375,42 +325,3 @@ void CrossEntropy::_initGrad()
         std::cout << "[ERROR] Exception " << e.what() << std::endl;
     }
 }
-
-//cudnn_frontend::Tensor CrossEntropy::_flattenTensor(cudnn_frontend::Tensor& tensor)
-//{
-//    // TODO: magic numbers remove I shall
-//    if (tensor.getDimCount() > 3)
-//    {
-//        auto tensorDim = tensor.getDim();
-//        int64_t flattenTensorDim[] = { tensorDim[0], 1, tensorDim[1] * tensorDim[2] * tensorDim[3] }; // can be done better
-//
-//        // TODO: Defaults, place
-//        constexpr int64_t alignment = 16; //16
-//        //constexpr cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-//        constexpr cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-//        constexpr float alpha = 1.0f;
-//        constexpr float beta = 0.0f;
-//        const int64_t FCstride[3] = { flattenTensorDim[1] * flattenTensorDim[2], 1, 1 };
-//        //Helpers::generateStrides(flattenTensorDim, FCstride, 3, tensorFormat);
-//        // 
-//        // RVO
-//        return cudnn_frontend::TensorBuilder()
-//            .setDim(3, flattenTensorDim)
-//            .setStride(3, FCstride)
-//            .setId(generateTensorId())
-//            .setAlignment(alignment)  // 16B alignment is needed to run a tensor core engine
-//            .setDataType(dataType)
-//            .build();
-//    }
-//    else
-//    {
-//        // RVO
-//        return cudnn_frontend::TensorBuilder()
-//            .setDim(3, tensor.getDim())
-//            .setStride(3, tensor.getStride())
-//            .setId(generateTensorId())
-//            .setAlignment(tensor.getAlignment())
-//            .setDataType(static_cast<cudnnDataType_t>(tensor.getDataType()))
-//            .build();
-//    }
-//}

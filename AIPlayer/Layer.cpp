@@ -1,24 +1,18 @@
+//module;
 #include "Layer.h"
 
 #include <cublas.h>
 #include <cudnn.h>
 #include <cudnn_frontend.h>
 #include "DevUtils.h"
+#include <iomanip>
+
+//module NeuralNetwork:Layer;
 
 import <iostream>;
 import <format>;
 import <exception>;
-//import <iomanip>;
-
-#include <iomanip>
-
-//constexpr float epsilon = 0.01f; // learning rate
-//constexpr int64_t alignment = 16; //16B to make Tensor cores work
-//constexpr cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-//constexpr cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-//constexpr int convDim = 2;
-//constexpr float alpha = 1.0f;
-//constexpr float beta = 0.0f;
+//import <iomanip>; // didn't work
 
 constexpr int precision = 8;
 
@@ -118,9 +112,6 @@ void Layer::printOutput()
 
     if (yDim[2] == yDim[3] && yDim[2] != 1)
     {
-        //cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-        //int64_t stride[4];
-        //generateStrides(yDim, stride, 4, tensorFormat);
         for (int64_t b = 0; b < yDim[0]; ++b)
         {
             for (int64_t c = 0; c < yDim[1]; ++c)

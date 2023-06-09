@@ -1,5 +1,6 @@
-#pragma once
-#include "Layer.h"
+export module NeuralNetwork:ConvBiasAct;
+
+import :Layer;
 
 class ConvBiasAct : public Layer
 {

@@ -1,5 +1,7 @@
 #include "Input.h"
 
+//module NeuralNetwork:Input;
+
 import <format>;
 
 Input::Input(cudnnHandle_t& handle, 
@@ -9,21 +11,7 @@ Input::Input(cudnnHandle_t& handle,
 	VERBOSITY verbosity,
 	std::string name)
 	: Layer(handle, nullptr, hyperparameters, std::move(name), verbosity)
-	//, mNbDims(nbDims)
 {
-	//constexpr int64_t alignment = 16;
-	//constexpr cudnnTensorFormat_t tensorFormat = CUDNN_TENSOR_NHWC;
-	//constexpr cudnnDataType_t dataType = CUDNN_DATA_FLOAT;
-	//std::vector<int64_t> stride(mNbDims);
-	//Utils::generateStrides(dims, stride.data(), mNbDims, tensorFormat);
-	//mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
-	//	.setAlignment(alignment)
-	//	.setDataType(dataType)
-	//	.setDim(mNbDims, dims)
-	//	.setStride(mNbDims, stride.data())
-	//	.setId(generateTensorId())
-	//	.build());
-
 	mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(Utils::createTensor(nbDims, dims, generateTensorId()));
 
 	int64_t size = std::accumulate(dims, dims + nbDims, 1ll, std::multiplies<int64_t>());

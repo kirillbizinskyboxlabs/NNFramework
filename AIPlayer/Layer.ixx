@@ -1,24 +1,28 @@
-#pragma once
+module;
 
 #include "DevUtils.h"
+
+export module NeuralNetwork:Layer;
 
 import <vector>;
 import <memory>;
 import <string>;
 import <filesystem>;
+import <cudnn.h>;
+//import <cudnn_frontend.h>;
 
-class Layer
+export class Layer
 {
 public:
-	Layer(cudnnHandle_t& handle, 
+    Layer(cudnnHandle_t& handle,
         Layer* previousLayer,
         const Hyperparameters& hyperparameters,
         std::string name = "",
         VERBOSITY verbosityLevel = VERBOSITY::ERROR);
-	virtual ~Layer();
+    virtual ~Layer();
 
     template <typename T_ELEM>
-    struct Surface 
+    struct Surface
     {
         //using namespace Utils;
 
@@ -26,8 +30,8 @@ public:
         T_ELEM* hostPtr = nullptr;
         int64_t n_elems = 0;
 
-        explicit Surface(int64_t n_elems, bool needHostPtr = true) 
-            : n_elems(n_elems) 
+        explicit Surface(int64_t n_elems, bool needHostPtr = true)
+            : n_elems(n_elems)
         {
             Utils::checkCudaError(cudaMalloc((void**)&(devPtr), (size_t)((n_elems) * sizeof(devPtr[0]))));
 
@@ -109,42 +113,42 @@ protected:
         return id++;
     }
 
-	void _setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
-		          std::vector<void*>& data_ptrs,
-		          std::vector<int64_t>& uids,
-		          std::unique_ptr<cudnn_frontend::ExecutionPlan>& plan,
-		          std::unique_ptr<cudnn_frontend::VariantPack>& variant,
-		          int64_t& workspace_size,
-		          void*& workspace_ptr);
+    void _setPlan(std::vector<cudnn_frontend::Operation const*>& ops,
+        std::vector<void*>& data_ptrs,
+        std::vector<int64_t>& uids,
+        std::unique_ptr<cudnn_frontend::ExecutionPlan>& plan,
+        std::unique_ptr<cudnn_frontend::VariantPack>& variant,
+        int64_t& workspace_size,
+        void*& workspace_ptr);
 
     void _setForwardPropagationPlan(std::vector<cudnn_frontend::Operation const*>& ops,
-                                    std::vector<void*>& data_ptrs,
-                                    std::vector<int64_t>& uids);
+        std::vector<void*>& data_ptrs,
+        std::vector<int64_t>& uids);
 
-	cudnnHandle_t& mHandle;
+    cudnnHandle_t& mHandle;
     VERBOSITY mVerbosityLevel;
 
-	std::unique_ptr<Surface<float>> mOutputSurface;
-	std::unique_ptr<Surface<float>> mGradSurface;
+    std::unique_ptr<Surface<float>> mOutputSurface;
+    std::unique_ptr<Surface<float>> mGradSurface;
 
-	std::unique_ptr<cudnn_frontend::Tensor> mOutputTensor; // outputTensor we will share it. does it justify using shared pointer? TODO: rethink whether to follow general notation or using a more meaningful name
-	std::unique_ptr<cudnn_frontend::Tensor> mGradTensor; // it's the same as output tensor
+    std::unique_ptr<cudnn_frontend::Tensor> mOutputTensor; // outputTensor we will share it. does it justify using shared pointer? TODO: rethink whether to follow general notation or using a more meaningful name
+    std::unique_ptr<cudnn_frontend::Tensor> mGradTensor; // it's the same as output tensor
 
-	std::unique_ptr<cudnn_frontend::ExecutionPlan> mForwardPropagationPlan;
-	std::unique_ptr<cudnn_frontend::VariantPack> mForwardPropagationVariantPack;
+    std::unique_ptr<cudnn_frontend::ExecutionPlan> mForwardPropagationPlan;
+    std::unique_ptr<cudnn_frontend::VariantPack> mForwardPropagationVariantPack;
 
-	std::unique_ptr<cudnn_frontend::ExecutionPlan> mDataGradPlan;
-	std::unique_ptr<cudnn_frontend::VariantPack> mDataGradVariantPack;
+    std::unique_ptr<cudnn_frontend::ExecutionPlan> mDataGradPlan;
+    std::unique_ptr<cudnn_frontend::VariantPack> mDataGradVariantPack;
 
     int64_t mDataGradWorkspaceSize;
     void* mDataGradWorkspacePtr;
 
-	int64_t mForwardPropagationWorkspaceSize;
-	void* mForwardPropagationWorkspacePtr;
+    int64_t mForwardPropagationWorkspaceSize;
+    void* mForwardPropagationWorkspacePtr;
 
     Layer* mPreviousLayer;
 
-	std::string mName;
+    std::string mName;
 
     const Hyperparameters& mHyperparameters;
 };

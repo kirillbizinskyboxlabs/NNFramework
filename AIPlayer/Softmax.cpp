@@ -1,10 +1,14 @@
 #include "Softmax.h"
+//module;
 
 #include "DevUtils.h"
+#include <iomanip>
+
+//module NeuralNetwork:Softmax;
 
 import <format>;
 import <iostream>;
-#include <iomanip>
+//#include <iomanip>
 
 Softmax::Softmax(cudnnHandle_t& handle, 
     Layer* previousLayer, 
@@ -61,15 +65,6 @@ Softmax::Softmax(cudnnHandle_t& handle,
         mDims.data(),
         stride);
 
-    // we need to define output
-    //mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(cudnn_frontend::TensorBuilder()
-    //    .setDim(nbDims, inputDim)
-    //    .setStride(nbDims, inputTensor.getStride())
-    //    .setId(generateTensorId())
-    //    .setAlignment(16)
-    //    .setDataType(CUDNN_DATA_FLOAT)
-    //    .build());
-
     mOutputTensor = std::make_unique<cudnn_frontend::Tensor>(Utils::createTensor(nbDims, inputDim, generateTensorId()));
 
 
@@ -120,7 +115,6 @@ void Softmax::printOutput()
     mPreviousLayer->getOutputSurface().devToHostSync();
     mOutputSurface->devToHostSync();
 
-    //auto yDim = yTensor->getDim();
     for (size_t i = 0; i < mDims.size(); ++i)
     {
         std::cout << std::format("yDim[{}]: {}", i, mDims[i]) << std::endl;
